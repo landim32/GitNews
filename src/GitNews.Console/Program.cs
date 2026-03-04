@@ -47,38 +47,82 @@ class Program
             var blogGenerator = provider.GetRequiredService<IBlogGeneratorService>();
             var markdownWriter = provider.GetRequiredService<IMarkdownWriter>();
 
-            // 1. Buscar dados do repositório
-            System.Console.WriteLine("[1/3] Coletando dados do repositório GitHub...");
-            var context = await githubService.GetRepositoryContextAsync(
-                settings.GitHub.Owner,
-                settings.GitHub.Repository,
-                settings.GitHub.MaxCommits);
+            // Determinar quais repositórios processar
+            List<string> repositories;
 
-            if (context.Commits.Count == 0)
+            if (!string.IsNullOrWhiteSpace(settings.GitHub.Repository))
             {
-                System.Console.WriteLine("Nenhum commit encontrado. Encerrando.");
-                return 0;
+                // Repositório específico configurado
+                repositories = new List<string> { settings.GitHub.Repository };
+                System.Console.WriteLine($"Processando repositório: {settings.GitHub.Owner}/{settings.GitHub.Repository}");
+            }
+            else
+            {
+                // Buscar todos os repositórios da conta
+                var repoNames = await githubService.GetRepositoryNamesAsync(
+                    settings.GitHub.Owner,
+                    settings.GitHub.IncludeForks);
+                repositories = repoNames.ToList();
             }
 
-            // 2. Gerar artigo de blog via ChatGPT
-            System.Console.WriteLine("[2/3] Gerando artigo de blog via ChatGPT...");
-            var blogPost = await blogGenerator.GenerateBlogPostAsync(context);
-
-            System.Console.WriteLine($"  Título: {blogPost.Title}");
-            System.Console.WriteLine($"  Categoria: {blogPost.Category}");
-            System.Console.WriteLine($"  Tags: {string.Join(", ", blogPost.Tags)}");
-
-            // 3. Salvar como Markdown
-            System.Console.WriteLine("[3/3] Salvando artigo em Markdown...");
-            var filePath = await markdownWriter.WritePostAsync(blogPost);
-
+            System.Console.WriteLine($"Total de repositórios a processar: {repositories.Count}");
             System.Console.WriteLine();
+
+            var successCount = 0;
+            var errorCount = 0;
+
+            for (int i = 0; i < repositories.Count; i++)
+            {
+                var repoName = repositories[i];
+                System.Console.WriteLine($"[{i + 1}/{repositories.Count}] Processando: {settings.GitHub.Owner}/{repoName}");
+                System.Console.WriteLine("----------------------------------------");
+
+                try
+                {
+                    // 1. Buscar dados do repositório
+                    System.Console.WriteLine("  [1/3] Coletando dados do repositório...");
+                    var context = await githubService.GetRepositoryContextAsync(
+                        settings.GitHub.Owner,
+                        repoName,
+                        settings.GitHub.MaxCommits);
+
+                    if (context.Commits.Count == 0)
+                    {
+                        System.Console.WriteLine("  Nenhum commit recente encontrado. Pulando.");
+                        System.Console.WriteLine();
+                        continue;
+                    }
+
+                    // 2. Gerar artigo de blog via ChatGPT
+                    System.Console.WriteLine("  [2/3] Gerando artigo de blog via ChatGPT...");
+                    var blogPost = await blogGenerator.GenerateBlogPostAsync(context);
+
+                    System.Console.WriteLine($"  Título: {blogPost.Title}");
+                    System.Console.WriteLine($"  Categoria: {blogPost.Category}");
+                    System.Console.WriteLine($"  Tags: {string.Join(", ", blogPost.Tags)}");
+
+                    // 3. Salvar como Markdown
+                    System.Console.WriteLine("  [3/3] Salvando artigo em Markdown...");
+                    var filePath = await markdownWriter.WritePostAsync(blogPost);
+
+                    System.Console.WriteLine($"  Arquivo: {filePath}");
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    System.Console.WriteLine($"  Erro ao processar {repoName}: {ex.Message}");
+                    errorCount++;
+                }
+
+                System.Console.WriteLine();
+            }
+
             System.Console.WriteLine("========================================");
-            System.Console.WriteLine("  Artigo gerado com sucesso!");
-            System.Console.WriteLine($"  Arquivo: {filePath}");
+            System.Console.WriteLine("  Processamento concluído!");
+            System.Console.WriteLine($"  Sucesso: {successCount} | Erros: {errorCount} | Total: {repositories.Count}");
             System.Console.WriteLine("========================================");
 
-            return 0;
+            return errorCount > 0 ? 1 : 0;
         }
         catch (Exception ex)
         {
@@ -121,6 +165,9 @@ class Program
                     if (i + 1 < args.Length && int.TryParse(args[++i], out var max))
                         settings.GitHub.MaxCommits = max;
                     break;
+                case "--include-forks":
+                    settings.GitHub.IncludeForks = true;
+                    break;
             }
         }
     }
@@ -143,13 +190,6 @@ class Program
             valid = false;
         }
 
-        if (string.IsNullOrWhiteSpace(settings.GitHub.Repository))
-        {
-            System.Console.WriteLine("Erro: Repositório não configurado.");
-            System.Console.WriteLine("  Use --repo <repo> ou variável GITNEWS_GITHUB__REPOSITORY");
-            valid = false;
-        }
-
         if (string.IsNullOrWhiteSpace(settings.OpenAI.ApiKey))
         {
             System.Console.WriteLine("Erro: API Key do OpenAI não configurada.");
@@ -167,24 +207,30 @@ class Program
         System.Console.WriteLine("Uso: GitNews.Console [opções]");
         System.Console.WriteLine();
         System.Console.WriteLine("Opções:");
-        System.Console.WriteLine("  -o, --owner <owner>         Owner do repositório GitHub");
-        System.Console.WriteLine("  -r, --repo <repo>           Nome do repositório GitHub");
+        System.Console.WriteLine("  -o, --owner <owner>         Owner da conta GitHub");
+        System.Console.WriteLine("  -r, --repo <repo>           Nome de um repositório específico (opcional)");
+        System.Console.WriteLine("                              Se omitido, processa todos os repositórios");
         System.Console.WriteLine("  --github-token <token>      Token de acesso do GitHub");
         System.Console.WriteLine("  --openai-key <key>          API Key do OpenAI (ChatGPT)");
         System.Console.WriteLine("  -m, --model <model>         Modelo do ChatGPT (padrão: gpt-4)");
         System.Console.WriteLine("  -d, --output <dir>          Diretório de saída (padrão: ./output)");
-        System.Console.WriteLine("  --max-commits <n>           Máximo de commits a analisar (padrão: 30)");
+        System.Console.WriteLine("  --max-commits <n>           Máximo de commits por repositório (padrão: 30)");
+        System.Console.WriteLine("  --include-forks             Incluir repositórios forkados");
         System.Console.WriteLine("  -h, --help                  Exibir esta ajuda");
         System.Console.WriteLine();
         System.Console.WriteLine("Variáveis de ambiente:");
         System.Console.WriteLine("  GITNEWS_GITHUB__TOKEN       Token de acesso do GitHub");
-        System.Console.WriteLine("  GITNEWS_GITHUB__OWNER       Owner do repositório");
-        System.Console.WriteLine("  GITNEWS_GITHUB__REPOSITORY  Nome do repositório");
+        System.Console.WriteLine("  GITNEWS_GITHUB__OWNER       Owner da conta");
+        System.Console.WriteLine("  GITNEWS_GITHUB__REPOSITORY  Repositório específico (opcional)");
         System.Console.WriteLine("  GITNEWS_OPENAI__APIKEY      API Key do OpenAI");
         System.Console.WriteLine("  GITNEWS_OPENAI__MODEL       Modelo do ChatGPT");
         System.Console.WriteLine("  GITNEWS_OUTPUT__OUTPUTDIRECTORY  Diretório de saída");
         System.Console.WriteLine();
-        System.Console.WriteLine("Exemplo:");
+        System.Console.WriteLine("Exemplos:");
+        System.Console.WriteLine("  # Processar todos os repositórios de uma conta:");
+        System.Console.WriteLine("  GitNews.Console --owner microsoft --github-token ghp_xxx --openai-key sk-xxx");
+        System.Console.WriteLine();
+        System.Console.WriteLine("  # Processar um repositório específico:");
         System.Console.WriteLine("  GitNews.Console --owner microsoft --repo vscode --github-token ghp_xxx --openai-key sk-xxx");
     }
 }

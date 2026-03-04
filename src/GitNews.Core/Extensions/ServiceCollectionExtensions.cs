@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
             opt.Owner = settings.GitHub.Owner;
             opt.Repository = settings.GitHub.Repository;
             opt.MaxCommits = settings.GitHub.MaxCommits;
+            opt.IncludeForks = settings.GitHub.IncludeForks;
         });
 
         services.Configure<OpenAISettings>(opt =>

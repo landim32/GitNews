@@ -11,8 +11,16 @@ public class GitHubSettings
 {
     public string Token { get; set; } = string.Empty;
     public string Owner { get; set; } = string.Empty;
+    /// <summary>
+    /// Opcional. Se vazio, processa todos os repositórios da conta.
+    /// Se preenchido, processa apenas o repositório especificado.
+    /// </summary>
     public string Repository { get; set; } = string.Empty;
     public int MaxCommits { get; set; } = 30;
+    /// <summary>
+    /// Se true, inclui repositórios forkados. Padrão: false.
+    /// </summary>
+    public bool IncludeForks { get; set; } = false;
 }
 
 public class OpenAISettings
