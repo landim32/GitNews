@@ -18,7 +18,8 @@ public class BlogGeneratorService : IBlogGeneratorService
         _httpClient = httpClient;
         _settings = settings.Value;
 
-        _httpClient.BaseAddress = new Uri(_settings.BaseUrl);
+        var baseUrl = _settings.BaseUrl.TrimEnd('/') + "/";
+        _httpClient.BaseAddress = new Uri(baseUrl);
         _httpClient.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", _settings.ApiKey);
     }
@@ -123,7 +124,7 @@ public class BlogGeneratorService : IBlogGeneratorService
         var json = JsonSerializer.Serialize(requestBody);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient.PostAsync("/v1/chat/completions", content);
+        var response = await _httpClient.PostAsync("chat/completions", content);
         response.EnsureSuccessStatusCode();
 
         var responseJson = await response.Content.ReadAsStringAsync();
