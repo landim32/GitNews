@@ -1,4 +1,4 @@
-namespace GitNews.Core.Models;
+namespace GitNews.Domain.Models;
 
 public class BlogPost
 {

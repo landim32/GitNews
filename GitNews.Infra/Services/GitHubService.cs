@@ -1,9 +1,9 @@
-using GitNews.Core.Interfaces;
-using GitNews.Core.Models;
+using GitNews.Domain.Interfaces;
+using GitNews.Domain.Models;
 using Microsoft.Extensions.Options;
 using Octokit;
 
-namespace GitNews.Core.Services;
+namespace GitNews.Infra.Services;
 
 public class GitHubService : IGitHubService
 {
@@ -23,11 +23,7 @@ public class GitHubService : IGitHubService
     {
         Console.WriteLine($"Listando repositórios de {owner}...");
 
-        var repos = await _client.Repository.GetAllForUser(owner, new RepositoryRequest
-        {
-            Sort = RepositorySort.Updated,
-            Direction = SortDirection.Descending
-        });
+        var repos = await _client.Repository.GetAllForUser(owner);
 
         var filtered = repos.AsEnumerable();
 

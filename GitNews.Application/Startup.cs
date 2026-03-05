@@ -1,14 +1,14 @@
-using GitNews.Core.Interfaces;
-using GitNews.Core.Models;
-using GitNews.Core.Services;
+using GitNews.Domain.Interfaces;
+using GitNews.Domain.Models;
+using GitNews.Domain.Services;
+using GitNews.Infra.Services;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
-namespace GitNews.Core.Extensions;
+namespace GitNews.Application;
 
-public static class ServiceCollectionExtensions
+public static class Startup
 {
-    public static IServiceCollection AddGitNewsServices(
+    public static IServiceCollection ConfigureServices(
         this IServiceCollection services,
         Action<GitNewsSettings> configureSettings)
     {

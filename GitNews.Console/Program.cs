@@ -1,6 +1,6 @@
-using GitNews.Core.Extensions;
-using GitNews.Core.Interfaces;
-using GitNews.Core.Models;
+using GitNews.Application;
+using GitNews.Domain.Interfaces;
+using GitNews.Domain.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -34,7 +34,7 @@ class Program
                 return 1;
 
             var services = new ServiceCollection();
-            services.AddGitNewsServices(opt =>
+            services.ConfigureServices(opt =>
             {
                 opt.GitHub = settings.GitHub;
                 opt.OpenAI = settings.OpenAI;

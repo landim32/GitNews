@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\GitNews.Core\GitNews.Core.csproj" />
+    <ProjectReference Include="..\GitNews.Application\GitNews.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

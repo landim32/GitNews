@@ -2,11 +2,11 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using GitNews.Core.Interfaces;
-using GitNews.Core.Models;
+using GitNews.Domain.Interfaces;
+using GitNews.Domain.Models;
 using Microsoft.Extensions.Options;
 
-namespace GitNews.Core.Services;
+namespace GitNews.Domain.Services;
 
 public class BlogGeneratorService : IBlogGeneratorService
 {

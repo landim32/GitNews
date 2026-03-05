@@ -1,6 +1,6 @@
-using GitNews.Core.Models;
+using GitNews.Domain.Models;
 
-namespace GitNews.Core.Interfaces;
+namespace GitNews.Domain.Interfaces;
 
 public interface IGitHubService
 {

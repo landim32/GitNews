@@ -1,9 +1,9 @@
 using System.Text;
-using GitNews.Core.Interfaces;
-using GitNews.Core.Models;
+using GitNews.Domain.Interfaces;
+using GitNews.Domain.Models;
 using Microsoft.Extensions.Options;
 
-namespace GitNews.Core.Services;
+namespace GitNews.Infra.Services;
 
 public class MarkdownWriter : IMarkdownWriter
 {
