@@ -1,18 +1,21 @@
-using GitNews.Domain.Interfaces;
-using GitNews.Domain.Models;
+using GitNews.DTO;
+using GitNews.Infra.Interfaces.AppServices;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Octokit;
 
-namespace GitNews.Infra.Services;
+namespace GitNews.Infra.AppServices;
 
-public class GitHubService : IGitHubService
+public class GitHubAppService : IGitHubAppService
 {
     private readonly GitHubClient _client;
     private readonly GitHubSettings _settings;
+    private readonly ILogger<GitHubAppService> _logger;
 
-    public GitHubService(IOptions<GitHubSettings> settings)
+    public GitHubAppService(IOptions<GitHubSettings> settings, ILogger<GitHubAppService> logger)
     {
         _settings = settings.Value;
+        _logger = logger;
         _client = new GitHubClient(new ProductHeaderValue("GitNews"))
         {
             Credentials = new Credentials(_settings.Token)
@@ -21,7 +24,7 @@ public class GitHubService : IGitHubService
 
     public async Task<IReadOnlyList<string>> GetRepositoryNamesAsync(string owner, bool includeForks)
     {
-        Console.WriteLine($"Listando repositórios de {owner}...");
+        _logger.LogInformation("Listing repositories for {Owner}...", owner);
 
         var repos = await _client.Repository.GetAllForUser(owner);
 
@@ -31,27 +34,53 @@ public class GitHubService : IGitHubService
             filtered = filtered.Where(r => !r.Fork);
 
         var names = filtered.Select(r => r.Name).ToList();
-        Console.WriteLine($"Total de repositórios encontrados: {names.Count}");
+        _logger.LogInformation("Total repositories found: {Count}", names.Count);
 
         return names;
     }
 
-    public async Task<RepositoryContext> GetRepositoryContextAsync(string owner, string repository, int maxCommits)
+    public async Task<RepositoryContextInfo> GetRepositoryContextAsync(string owner, string repository, int maxCommits)
     {
-        var context = new RepositoryContext
+        var context = new RepositoryContextInfo
         {
             Owner = owner,
             Repository = repository
         };
 
-        Console.WriteLine($"  Buscando README de {owner}/{repository}...");
+        _logger.LogInformation("Fetching README for {Owner}/{Repository}...", owner, repository);
         context.ReadmeContent = await GetReadmeAsync(owner, repository);
 
-        Console.WriteLine($"  Buscando últimos {maxCommits} commits da main...");
+        _logger.LogInformation("Fetching total commit count...");
+        context.TotalCommitCount = await GetTotalCommitCountAsync(owner, repository);
+        _logger.LogInformation("Total commits in repository: {Count}", context.TotalCommitCount);
+
+        _logger.LogInformation("Fetching last {MaxCommits} commits from main...", maxCommits);
         context.Commits = await GetCommitsAsync(owner, repository, maxCommits);
 
-        Console.WriteLine($"  Commits encontrados: {context.Commits.Count}");
+        _logger.LogInformation("Commits found: {Count}", context.Commits.Count);
         return context;
+    }
+
+    private async Task<int> GetTotalCommitCountAsync(string owner, string repository)
+    {
+        try
+        {
+            var repo = await _client.Repository.Get(owner, repository);
+            var defaultBranch = repo.DefaultBranch;
+
+            var request = new CommitRequest { Sha = defaultBranch };
+            var apiOptions = new ApiOptions { PageSize = 1, PageCount = 1 };
+
+            var commits = await _client.Repository.Commit.GetAll(owner, repository, request, apiOptions);
+
+            var allCommits = await _client.Repository.Commit.GetAll(owner, repository, request);
+            return allCommits.Count;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to count commits");
+            return int.MaxValue;
+        }
     }
 
     private async Task<string> GetReadmeAsync(string owner, string repository)
@@ -63,14 +92,14 @@ public class GitHubService : IGitHubService
         }
         catch (NotFoundException)
         {
-            Console.WriteLine("  README.md não encontrado.");
+            _logger.LogDebug("README.md not found");
             return string.Empty;
         }
     }
 
-    private async Task<List<CommitInfo>> GetCommitsAsync(string owner, string repository, int maxCommits)
+    private async Task<List<CommitInfoDto>> GetCommitsAsync(string owner, string repository, int maxCommits)
     {
-        var commits = new List<CommitInfo>();
+        var commits = new List<CommitInfoDto>();
 
         try
         {
@@ -92,20 +121,20 @@ public class GitHubService : IGitHubService
             {
                 var commitDetail = await _client.Repository.Commit.Get(owner, repository, githubCommit.Sha);
 
-                var commitInfo = new CommitInfo
+                var commitInfo = new CommitInfoDto
                 {
                     Sha = githubCommit.Sha,
                     Message = githubCommit.Commit.Message,
-                    Author = githubCommit.Commit.Author?.Name ?? "Desconhecido",
+                    Author = githubCommit.Commit.Author?.Name ?? "Unknown",
                     Date = githubCommit.Commit.Author?.Date ?? DateTimeOffset.MinValue,
-                    Files = commitDetail.Files?.Select(f => new FileChange
+                    Files = commitDetail.Files?.Select(f => new FileChangeInfo
                     {
                         FileName = f.Filename,
                         Status = f.Status,
                         Additions = f.Additions,
                         Deletions = f.Deletions,
                         Patch = TruncatePatch(f.Patch ?? string.Empty, 500)
-                    }).ToList() ?? new List<FileChange>()
+                    }).ToList() ?? new List<FileChangeInfo>()
                 };
 
                 commits.Add(commitInfo);
@@ -113,7 +142,7 @@ public class GitHubService : IGitHubService
         }
         catch (NotFoundException)
         {
-            Console.WriteLine($"  Branch 'main' não encontrada em {owner}/{repository}. Tentando branch padrão...");
+            _logger.LogWarning("Branch 'main' not found in {Owner}/{Repository}. Trying default branch...", owner, repository);
 
             try
             {
@@ -138,20 +167,20 @@ public class GitHubService : IGitHubService
                 {
                     var commitDetail = await _client.Repository.Commit.Get(owner, repository, githubCommit.Sha);
 
-                    var commitInfo = new CommitInfo
+                    var commitInfo = new CommitInfoDto
                     {
                         Sha = githubCommit.Sha,
                         Message = githubCommit.Commit.Message,
-                        Author = githubCommit.Commit.Author?.Name ?? "Desconhecido",
+                        Author = githubCommit.Commit.Author?.Name ?? "Unknown",
                         Date = githubCommit.Commit.Author?.Date ?? DateTimeOffset.MinValue,
-                        Files = commitDetail.Files?.Select(f => new FileChange
+                        Files = commitDetail.Files?.Select(f => new FileChangeInfo
                         {
                             FileName = f.Filename,
                             Status = f.Status,
                             Additions = f.Additions,
                             Deletions = f.Deletions,
                             Patch = TruncatePatch(f.Patch ?? string.Empty, 500)
-                        }).ToList() ?? new List<FileChange>()
+                        }).ToList() ?? new List<FileChangeInfo>()
                     };
 
                     commits.Add(commitInfo);
@@ -159,7 +188,7 @@ public class GitHubService : IGitHubService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"  Erro ao buscar commits: {ex.Message}");
+                _logger.LogError(ex, "Failed to fetch commits from {Owner}/{Repository}", owner, repository);
             }
         }
 
@@ -173,6 +202,6 @@ public class GitHubService : IGitHubService
 
         return patch.Length <= maxLength
             ? patch
-            : patch[..maxLength] + "\n... (truncado)";
+            : patch[..maxLength] + "\n... (truncated)";
     }
 }

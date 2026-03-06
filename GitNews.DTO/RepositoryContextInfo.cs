@@ -1,9 +1,10 @@
-namespace GitNews.Domain.Models;
+namespace GitNews.DTO;
 
-public class RepositoryContext
+public class RepositoryContextInfo
 {
     public string Owner { get; set; } = string.Empty;
     public string Repository { get; set; } = string.Empty;
     public string ReadmeContent { get; set; } = string.Empty;
-    public List<CommitInfo> Commits { get; set; } = new();
+    public List<CommitInfoDto> Commits { get; set; } = new();
+    public int TotalCommitCount { get; set; }
 }

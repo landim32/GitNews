@@ -1,12 +1,12 @@
-namespace GitNews.Domain.Models;
+namespace GitNews.DTO;
 
-public class BlogPost
+public class BlogPostInfo
 {
     public string Title { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
     public List<string> Tags { get; set; } = new();
     public string Author { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
     public string Slug { get; set; } = string.Empty;
 }

@@ -1,15 +1,15 @@
-namespace GitNews.Domain.Models;
+namespace GitNews.DTO;
 
-public class CommitInfo
+public class CommitInfoDto
 {
     public string Sha { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public string Author { get; set; } = string.Empty;
     public DateTimeOffset Date { get; set; }
-    public List<FileChange> Files { get; set; } = new();
+    public List<FileChangeInfo> Files { get; set; } = new();
 }
 
-public class FileChange
+public class FileChangeInfo
 {
     public string FileName { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;

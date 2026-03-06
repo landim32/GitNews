@@ -1,21 +1,16 @@
-namespace GitNews.Domain.Models;
+namespace GitNews.DTO;
 
 public class GitNewsSettings
 {
     public GitHubSettings GitHub { get; set; } = new();
     public OpenAISettings OpenAI { get; set; } = new();
-    public OutputSettings Output { get; set; } = new();
+    public DatabaseSettings Database { get; set; } = new();
 }
 
 public class GitHubSettings
 {
     public string Token { get; set; } = string.Empty;
     public string Owner { get; set; } = string.Empty;
-    /// <summary>
-    /// Opcional. Se vazio, processa todos os repositórios da conta.
-    /// Se preenchido, processa apenas o repositório especificado.
-    /// </summary>
-    public string Repository { get; set; } = string.Empty;
     public int MaxCommits { get; set; } = 30;
     /// <summary>
     /// Se true, inclui repositórios forkados. Padrão: false.
@@ -30,7 +25,15 @@ public class OpenAISettings
     public string BaseUrl { get; set; } = "https://api.openai.com/v1";
 }
 
-public class OutputSettings
+public class DatabaseSettings
 {
-    public string OutputDirectory { get; set; } = "./output";
+    public string ConnectionString { get; set; } = string.Empty;
+}
+
+public class WorkerSettings
+{
+    /// <summary>
+    /// Time of day to run the worker (HH:mm format). Default: 19:00.
+    /// </summary>
+    public string ScheduleTime { get; set; } = "19:00";
 }

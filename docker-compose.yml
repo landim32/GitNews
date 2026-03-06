@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: gitnews-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - gitnews-data:/var/lib/postgresql/data
+
+  worker:
+    build:
+      context: .
+      dockerfile: GitNews.Worker/Dockerfile
+    container_name: gitnews-worker
+    depends_on:
+      - postgres
+    environment:
+      GITNEWS_GITHUB__TOKEN: ${GITHUB_TOKEN}
+      GITNEWS_GITHUB__OWNER: ${GITHUB_OWNER}
+      GITNEWS_GITHUB__MAXCOMMITS: ${GITHUB_MAXCOMMITS:-30}
+      GITNEWS_GITHUB__INCLUDEFORKS: ${GITHUB_INCLUDEFORKS:-false}
+      GITNEWS_OPENAI__APIKEY: ${OPENAI_APIKEY}
+      GITNEWS_OPENAI__MODEL: ${OPENAI_MODEL:-gpt-4}
+      GITNEWS_OPENAI__BASEURL: ${OPENAI_BASEURL:-https://api.openai.com/v1}
+      GITNEWS_DATABASE__CONNECTIONSTRING: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      GITNEWS_WORKER__SCHEDULETIME: ${WORKER_SCHEDULETIME:-19:00}
+    restart: unless-stopped
+
+volumes:
+  gitnews-data:

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "Bash(dotnet ef:*)",
+      "Bash(dotnet add:*)",
+      "Bash(docker compose:*)",
+      "Bash(\"/c/Program Files/Docker/Docker/resources/bin/docker\" compose:*)",
+      "Bash(dotnet run:*)",
+      "Bash(dotnet:*)"
+    ]
+  }
+}
