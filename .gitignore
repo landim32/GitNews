@@ -418,3 +418,5 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+/GitNews.Console/gitnews.db
+/GitNews.Console/output
