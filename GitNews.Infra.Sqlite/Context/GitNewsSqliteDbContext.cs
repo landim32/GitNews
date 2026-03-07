@@ -55,6 +55,10 @@ public class GitNewsSqliteDbContext : DbContext
             entity.Property(e => e.ImageBase64)
                 .HasColumnName("image_base64");
 
+            entity.Property(e => e.IsProcessed)
+                .HasColumnName("is_processed")
+                .HasDefaultValue(false);
+
             // SQLite has no vector type — store as BLOB
             entity.Property(e => e.Embedding)
                 .HasColumnName("embedding")

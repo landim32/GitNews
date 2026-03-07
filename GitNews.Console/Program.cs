@@ -52,10 +52,21 @@ class Program
                 logger.LogInformation("Database updated");
             }
 
+            var command = GetCommand(args);
+
             using (var scope = provider.CreateScope())
             {
                 var processor = scope.ServiceProvider.GetRequiredService<IGitNewsProcessorService>();
+
+                if (command == "export")
+                {
+                    var outputDir = GetOutputDir(args);
+                    var exported = await processor.ExportOldestUnprocessedArticleAsync(outputDir);
+                    return exported ? 0 : 1;
+                }
+
                 var result = await processor.ProcessAllRepositoriesAsync();
+                await processor.GenerateMissingImagesAsync();
                 return result.HasErrors ? 1 : 0;
             }
         }
@@ -68,6 +79,26 @@ class Program
         }
     }
 
+    private static string GetOutputDir(string[] args)
+    {
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i].Equals("--output-dir", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                return args[i + 1];
+        }
+        return Path.Combine(Directory.GetCurrentDirectory(), "output");
+    }
+
+    private static string? GetCommand(string[] args)
+    {
+        foreach (var arg in args)
+        {
+            if (arg.Equals("--export", StringComparison.OrdinalIgnoreCase))
+                return "export";
+        }
+        return null;
+    }
+
     private static void ParseArguments(string[] args, GitNewsSettings settings)
     {
         for (int i = 0; i < args.Length; i++)
@@ -77,6 +108,11 @@ class Program
                 case "--help" or "-h":
                     PrintHelp();
                     Environment.Exit(0);
+                    break;
+                case "--export":
+                    break;
+                case "--output-dir":
+                    if (i + 1 < args.Length) i++;
                     break;
                 case "--owner" or "-o":
                     if (i + 1 < args.Length) settings.GitHub.Owner = args[++i];
@@ -144,6 +180,10 @@ class Program
         System.Console.WriteLine("GitNews - Blog article generator from GitHub repositories");
         System.Console.WriteLine();
         System.Console.WriteLine("Usage: GitNews.Console [options]");
+        System.Console.WriteLine();
+        System.Console.WriteLine("Commands:");
+        System.Console.WriteLine("  --export                    Export oldest unprocessed article to output/ (markdown + image)");
+        System.Console.WriteLine("  --output-dir <dir>          Output directory for --export (default: ./output)");
         System.Console.WriteLine();
         System.Console.WriteLine("Options:");
         System.Console.WriteLine("  -o, --owner <owner>         GitHub account owner");

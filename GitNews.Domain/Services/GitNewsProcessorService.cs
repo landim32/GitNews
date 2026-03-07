@@ -176,4 +176,107 @@ public class GitNewsProcessorService : IGitNewsProcessorService
 
         return true;
     }
+
+    public async Task<bool> ExportOldestUnprocessedArticleAsync(string outputDir, CancellationToken cancellationToken = default)
+    {
+        var article = await _articleRepo.FindOldestUnprocessedAsync();
+
+        if (article == null)
+        {
+            _logger.LogInformation("No unprocessed articles found");
+            return false;
+        }
+
+        _logger.LogInformation("Exporting article: {Title}", article.Title);
+
+        Directory.CreateDirectory(outputDir);
+
+        var slug = article.Slug;
+        if (string.IsNullOrWhiteSpace(slug))
+            slug = $"article-{article.Id}";
+
+        // Generate image if missing
+        if (string.IsNullOrWhiteSpace(article.ImageBase64))
+        {
+            _logger.LogInformation("Article has no image. Generating via DALL-E...");
+            try
+            {
+                var imagePrompt = $"Create a modern, minimalist tech blog header image about: {article.Title}. Style: flat design, vibrant colors, no text.";
+                article.ImageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to generate image");
+            }
+        }
+
+        // Save image as PNG
+        var imageFileName = $"{slug}.png";
+        if (!string.IsNullOrWhiteSpace(article.ImageBase64))
+        {
+            var imagePath = Path.Combine(outputDir, imageFileName);
+            var imageBytes = Convert.FromBase64String(article.ImageBase64);
+            await File.WriteAllBytesAsync(imagePath, imageBytes, cancellationToken);
+            _logger.LogInformation("Image saved: {Path}", imagePath);
+        }
+
+        // Build markdown with YAML front matter
+        var md = new System.Text.StringBuilder();
+        md.AppendLine("---");
+        md.AppendLine($"title: \"{article.Title.Replace("\"", "\\\"")}\"");
+        md.AppendLine($"slug: \"{slug}\"");
+        md.AppendLine($"category: \"{article.Category}\"");
+        md.AppendLine($"tags: [{string.Join(", ", article.Tags.Split(',', StringSplitOptions.TrimEntries).Select(t => $"\"{t}\""))}]");
+        md.AppendLine($"author: \"{article.Author}\"");
+        md.AppendLine($"date: \"{article.CreatedAt:yyyy-MM-dd}\"");
+        if (!string.IsNullOrWhiteSpace(article.ImageBase64))
+            md.AppendLine($"image: \"{imageFileName}\"");
+        md.AppendLine("---");
+        md.AppendLine();
+        md.AppendLine(article.Content);
+
+        var mdPath = Path.Combine(outputDir, $"{slug}.md");
+        await File.WriteAllTextAsync(mdPath, md.ToString(), cancellationToken);
+        _logger.LogInformation("Markdown saved: {Path}", mdPath);
+
+        // Mark as processed
+        article.IsProcessed = true;
+        await _articleRepo.UpdateAsync(article);
+        _logger.LogInformation("Article marked as processed: {Title}", article.Title);
+
+        return true;
+    }
+
+    public async Task GenerateMissingImagesAsync(CancellationToken cancellationToken = default)
+    {
+        var articles = await _articleRepo.FindWithoutImageAsync();
+
+        if (articles.Count == 0)
+        {
+            _logger.LogInformation("All articles already have images");
+            return;
+        }
+
+        _logger.LogInformation("Found {Count} articles without images", articles.Count);
+
+        for (int i = 0; i < articles.Count; i++)
+        {
+            if (cancellationToken.IsCancellationRequested) break;
+
+            var article = articles[i];
+            _logger.LogInformation("[{Current}/{Total}] Generating image for: {Title}", i + 1, articles.Count, article.Title);
+
+            try
+            {
+                var imagePrompt = $"Create a modern, minimalist tech blog header image about: {article.Title}. Style: flat design, vibrant colors, no text.";
+                article.ImageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
+                await _articleRepo.UpdateAsync(article);
+                _logger.LogInformation("Image saved for article: {Title}", article.Title);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to generate image for article: {Title}", article.Title);
+            }
+        }
+    }
 }

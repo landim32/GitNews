@@ -21,6 +21,28 @@ public class ArticleRepository : IArticleRepository<Article>
         return article;
     }
 
+    public async Task<Article> UpdateAsync(Article article)
+    {
+        _context.Articles.Update(article);
+        await _context.SaveChangesAsync();
+        return article;
+    }
+
+    public async Task<List<Article>> FindWithoutImageAsync()
+    {
+        return await _context.Articles
+            .Where(a => a.ImageBase64 == null || a.ImageBase64 == "")
+            .ToListAsync();
+    }
+
+    public async Task<Article?> FindOldestUnprocessedAsync()
+    {
+        return await _context.Articles
+            .Where(a => !a.IsProcessed)
+            .OrderBy(a => a.CreatedAt)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<List<Article>> FindSimilarAsync(float[] embedding, double threshold = 0.85, int limit = 3)
     {
         // SQLite has no vector operations — load embeddings and compute cosine similarity in memory

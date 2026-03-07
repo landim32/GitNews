@@ -69,6 +69,10 @@ public class GitNewsDbContext : DbContext
             entity.Property(e => e.ImageBase64)
                 .HasColumnName("image_base64");
 
+            entity.Property(e => e.IsProcessed)
+                .HasColumnName("is_processed")
+                .HasDefaultValue(false);
+
             entity.Property(e => e.CreatedAt)
                 .HasColumnName("created_at")
                 .HasColumnType("timestamp with time zone")

@@ -12,5 +12,6 @@ public class Article
     public string Slug { get; set; } = string.Empty;
     public float[]? Embedding { get; set; }
     public string? ImageBase64 { get; set; }
+    public bool IsProcessed { get; set; } = false;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

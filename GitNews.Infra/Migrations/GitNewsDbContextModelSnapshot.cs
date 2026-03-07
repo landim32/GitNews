@@ -64,6 +64,12 @@ namespace GitNews.Infra.Migrations
                         .HasColumnType("text")
                         .HasColumnName("image_base64");
 
+                    b.Property<bool>("IsProcessed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_processed");
+
                     b.Property<string>("Repository")
                         .IsRequired()
                         .HasMaxLength(500)
