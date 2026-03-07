@@ -11,5 +11,6 @@ public class Article
     public string Author { get; set; } = string.Empty;
     public string Slug { get; set; } = string.Empty;
     public float[]? Embedding { get; set; }
+    public string? ImageBase64 { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

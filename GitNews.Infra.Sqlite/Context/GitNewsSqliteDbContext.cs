@@ -1,13 +1,11 @@
 using GitNews.Domain.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Pgvector;
 
-namespace GitNews.Infra.Context;
+namespace GitNews.Infra.Sqlite.Context;
 
-public class GitNewsDbContext : DbContext
+public class GitNewsSqliteDbContext : DbContext
 {
-    public GitNewsDbContext(DbContextOptions<GitNewsDbContext> options) : base(options)
+    public GitNewsSqliteDbContext(DbContextOptions<GitNewsSqliteDbContext> options) : base(options)
     {
     }
 
@@ -16,12 +14,6 @@ public class GitNewsDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.HasPostgresExtension("vector");
-
-        var vectorConverter = new ValueConverter<float[]?, Vector>(
-            v => v != null ? new Vector(v) : new Vector(Array.Empty<float>()),
-            v => v.ToArray());
-
         modelBuilder.Entity<Article>(entity =>
         {
             entity.ToTable("articles");
@@ -29,8 +21,7 @@ public class GitNewsDbContext : DbContext
             entity.HasKey(e => e.Id);
 
             entity.Property(e => e.Id)
-                .HasColumnName("id")
-                .UseIdentityAlwaysColumn();
+                .HasColumnName("id");
 
             entity.Property(e => e.Title)
                 .HasColumnName("title")
@@ -61,18 +52,19 @@ public class GitNewsDbContext : DbContext
                 .HasColumnName("slug")
                 .HasMaxLength(500);
 
-            entity.Property(e => e.Embedding)
-                .HasColumnName("embedding")
-                .HasColumnType("vector(1536)")
-                .HasConversion(vectorConverter);
-
             entity.Property(e => e.ImageBase64)
                 .HasColumnName("image_base64");
 
+            // SQLite has no vector type — store as BLOB
+            entity.Property(e => e.Embedding)
+                .HasColumnName("embedding")
+                .HasConversion(
+                    v => v != null ? FloatArrayToBytes(v) : null,
+                    v => v != null ? BytesToFloatArray(v) : null);
+
             entity.Property(e => e.CreatedAt)
                 .HasColumnName("created_at")
-                .HasColumnType("timestamp with time zone")
-                .HasDefaultValueSql("now()");
+                .HasDefaultValueSql("datetime('now')");
         });
 
         modelBuilder.Entity<ProcessedCommit>(entity =>
@@ -82,8 +74,7 @@ public class GitNewsDbContext : DbContext
             entity.HasKey(e => e.Id);
 
             entity.Property(e => e.Id)
-                .HasColumnName("id")
-                .UseIdentityAlwaysColumn();
+                .HasColumnName("id");
 
             entity.Property(e => e.Repository)
                 .HasColumnName("repository")
@@ -97,12 +88,25 @@ public class GitNewsDbContext : DbContext
 
             entity.Property(e => e.ProcessedAt)
                 .HasColumnName("processed_at")
-                .HasColumnType("timestamp with time zone")
-                .HasDefaultValueSql("now()");
+                .HasDefaultValueSql("datetime('now')");
 
             entity.HasIndex(e => new { e.Repository, e.Sha })
                 .IsUnique()
                 .HasDatabaseName("ix_processed_commits_repository_sha");
         });
+    }
+
+    private static byte[] FloatArrayToBytes(float[] floats)
+    {
+        var bytes = new byte[floats.Length * sizeof(float)];
+        Buffer.BlockCopy(floats, 0, bytes, 0, bytes.Length);
+        return bytes;
+    }
+
+    private static float[] BytesToFloatArray(byte[] bytes)
+    {
+        var floats = new float[bytes.Length / sizeof(float)];
+        Buffer.BlockCopy(bytes, 0, floats, 0, bytes.Length);
+        return floats;
     }
 }

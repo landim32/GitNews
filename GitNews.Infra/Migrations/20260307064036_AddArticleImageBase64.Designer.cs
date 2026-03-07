@@ -3,6 +3,7 @@ using System;
 using GitNews.Infra.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
@@ -12,9 +13,11 @@ using Pgvector;
 namespace GitNews.Infra.Migrations
 {
     [DbContext(typeof(GitNewsDbContext))]
-    partial class GitNewsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260307064036_AddArticleImageBase64")]
+    partial class AddArticleImageBase64
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

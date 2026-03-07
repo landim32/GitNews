@@ -228,15 +228,15 @@ dotnet run --project GitNews.Worker
 
 ### Environment Variables
 
-All settings can be configured via environment variables with the `GITNEWS_` prefix:
+All settings can be configured via environment variables using the ASP.NET Core `__` convention:
 
 | Variable | Description |
 |----------|-------------|
-| `GITNEWS_GITHUB__TOKEN` | GitHub access token |
-| `GITNEWS_GITHUB__OWNER` | Account owner |
-| `GITNEWS_OPENAI__APIKEY` | OpenAI API key |
-| `GITNEWS_OPENAI__MODEL` | ChatGPT model |
-| `GITNEWS_DATABASE__CONNECTIONSTRING` | PostgreSQL connection string |
+| `GitHub__Token` | GitHub access token |
+| `GitHub__Owner` | Account owner |
+| `OpenAI__ApiKey` | OpenAI API key |
+| `OpenAI__Model` | ChatGPT model |
+| `Database__ConnectionString` | PostgreSQL connection string |
 
 ---
 

@@ -13,6 +13,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
     private readonly IGitHubAppService _githubService;
     private readonly IBlogGeneratorAppService _blogGenerator;
     private readonly IEmbeddingAppService _embeddingService;
+    private readonly IDallEAppService _dallEService;
     private readonly IProcessedCommitRepository<ProcessedCommit> _commitRepo;
     private readonly IArticleRepository<Article> _articleRepo;
     private readonly GitHubSettings _githubSettings;
@@ -22,6 +23,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         IGitHubAppService githubService,
         IBlogGeneratorAppService blogGenerator,
         IEmbeddingAppService embeddingService,
+        IDallEAppService dallEService,
         IProcessedCommitRepository<ProcessedCommit> commitRepo,
         IArticleRepository<Article> articleRepo,
         IOptions<GitHubSettings> githubSettings,
@@ -30,6 +32,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         _githubService = githubService;
         _blogGenerator = blogGenerator;
         _embeddingService = embeddingService;
+        _dallEService = dallEService;
         _commitRepo = commitRepo;
         _articleRepo = articleRepo;
         _githubSettings = githubSettings.Value;
@@ -78,7 +81,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
 
     private async Task<bool?> ProcessRepositoryAsync(string repoName, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("[1/6] Collecting repository data...");
+        _logger.LogInformation("[1/7] Collecting repository data...");
         var context = await _githubService.GetRepositoryContextAsync(
             _githubSettings.Owner,
             repoName,
@@ -90,7 +93,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
             return null;
         }
 
-        _logger.LogInformation("[2/6] Checking already processed commits...");
+        _logger.LogInformation("[2/7] Checking already processed commits...");
         var repoFullName = $"{_githubSettings.Owner}/{repoName}";
         var unprocessedCommits = new List<CommitInfoDto>();
 
@@ -113,7 +116,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
             context.TotalCommitCount,
             context.TotalCommitCount <= 3 ? "new project" : "existing project");
 
-        _logger.LogInformation("[3/6] Generating blog article via ChatGPT...");
+        _logger.LogInformation("[3/7] Generating blog article via ChatGPT...");
         var blogPost = await _blogGenerator.GenerateBlogPostAsync(context);
 
         await _commitRepo.MarkAsProcessedAsync(repoFullName, unprocessedCommits.Select(c => c.Sha));
@@ -125,11 +128,11 @@ public class GitNewsProcessorService : IGitNewsProcessorService
             return null;
         }
 
-        _logger.LogInformation("[4/6] Generating article embedding...");
+        _logger.LogInformation("[4/7] Generating article embedding...");
         var embeddingText = $"{blogPost.Title} {blogPost.Content}";
         var embedding = await _embeddingService.GenerateEmbeddingAsync(embeddingText);
 
-        _logger.LogInformation("[5/6] Checking for similar articles...");
+        _logger.LogInformation("[5/7] Checking for similar articles...");
         var similarArticles = await _articleRepo.FindSimilarAsync(embedding);
 
         if (similarArticles.Count > 0)
@@ -142,7 +145,19 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         _logger.LogInformation("Category: {Category}", blogPost.Category);
         _logger.LogInformation("Tags: {Tags}", string.Join(", ", blogPost.Tags));
 
-        _logger.LogInformation("[6/6] Saving article to database...");
+        _logger.LogInformation("[6/7] Generating article image via DALL-E...");
+        string? imageBase64 = null;
+        try
+        {
+            var imagePrompt = $"Create a modern, minimalist tech blog header image about: {blogPost.Title}. Style: flat design, vibrant colors, no text.";
+            imageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to generate image. Article will be saved without image");
+        }
+
+        _logger.LogInformation("[7/7] Saving article to database...");
         var article = new Article
         {
             Title = blogPost.Title,
@@ -153,6 +168,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
             Author = blogPost.Author,
             Slug = blogPost.Slug,
             Embedding = embedding,
+            ImageBase64 = imageBase64,
             CreatedAt = DateTime.UtcNow
         };
         await _articleRepo.SaveAsync(article);

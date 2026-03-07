@@ -1,7 +1,6 @@
 using GitNews.Application;
 using GitNews.Domain.Interfaces;
 using GitNews.DTO;
-using GitNews.Infra.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,7 +23,7 @@ class Program
                 .SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
                 .AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: false)
-                .AddEnvironmentVariables("GITNEWS_")
+                .AddEnvironmentVariables()
                 .Build();
 
             var settings = new GitNewsSettings();
@@ -48,7 +47,7 @@ class Program
 
             using (var scope = provider.CreateScope())
             {
-                var dbContext = scope.ServiceProvider.GetRequiredService<GitNewsDbContext>();
+                var dbContext = scope.ServiceProvider.GetRequiredService<DbContext>();
                 await dbContext.Database.MigrateAsync();
                 logger.LogInformation("Database updated");
             }
@@ -112,28 +111,28 @@ class Program
         if (string.IsNullOrWhiteSpace(settings.GitHub.Token))
         {
             System.Console.WriteLine("Error: GitHub token not configured.");
-            System.Console.WriteLine("  Use --github-token <token> or env var GITNEWS_GITHUB__TOKEN");
+            System.Console.WriteLine("  Use --github-token <token> or env var GitHub__Token");
             valid = false;
         }
 
         if (string.IsNullOrWhiteSpace(settings.GitHub.Owner))
         {
             System.Console.WriteLine("Error: Repository owner not configured.");
-            System.Console.WriteLine("  Use --owner <owner> or env var GITNEWS_GITHUB__OWNER");
+            System.Console.WriteLine("  Use --owner <owner> or env var GitHub__Owner");
             valid = false;
         }
 
         if (string.IsNullOrWhiteSpace(settings.OpenAI.ApiKey))
         {
             System.Console.WriteLine("Error: OpenAI API key not configured.");
-            System.Console.WriteLine("  Use --openai-key <key> or env var GITNEWS_OPENAI__APIKEY");
+            System.Console.WriteLine("  Use --openai-key <key> or env var OpenAI__ApiKey");
             valid = false;
         }
 
         if (string.IsNullOrWhiteSpace(settings.Database.ConnectionString))
         {
             System.Console.WriteLine("Error: PostgreSQL connection string not configured.");
-            System.Console.WriteLine("  Use --connection-string <conn> or env var GITNEWS_DATABASE__CONNECTIONSTRING");
+            System.Console.WriteLine("  Use --connection-string <conn> or env var Database__ConnectionString");
             valid = false;
         }
 
@@ -157,17 +156,17 @@ class Program
         System.Console.WriteLine("  -h, --help                  Show this help");
         System.Console.WriteLine();
         System.Console.WriteLine("Environment variables:");
-        System.Console.WriteLine("  GITNEWS_GITHUB__TOKEN       GitHub access token");
-        System.Console.WriteLine("  GITNEWS_GITHUB__OWNER       Account owner");
-        System.Console.WriteLine("  GITNEWS_OPENAI__APIKEY      OpenAI API key");
-        System.Console.WriteLine("  GITNEWS_OPENAI__MODEL       ChatGPT model");
-        System.Console.WriteLine("  GITNEWS_DATABASE__CONNECTIONSTRING  PostgreSQL connection string");
+        System.Console.WriteLine("  GitHub__Token                GitHub access token");
+        System.Console.WriteLine("  GitHub__Owner                Account owner");
+        System.Console.WriteLine("  OpenAI__ApiKey               OpenAI API key");
+        System.Console.WriteLine("  OpenAI__Model                ChatGPT model");
+        System.Console.WriteLine("  Database__ConnectionString   PostgreSQL connection string");
         System.Console.WriteLine();
         System.Console.WriteLine("Examples:");
         System.Console.WriteLine("  # Process all repositories from an account:");
         System.Console.WriteLine("  GitNews.Console --owner microsoft --github-token ghp_xxx --openai-key sk-xxx");
         System.Console.WriteLine();
         System.Console.WriteLine("  # Process with environment variables:");
-        System.Console.WriteLine("  GITNEWS_GITHUB__OWNER=microsoft GitNews.Console --github-token ghp_xxx --openai-key sk-xxx");
+        System.Console.WriteLine("  GitHub__Owner=microsoft GitNews.Console --github-token ghp_xxx --openai-key sk-xxx");
     }
 }

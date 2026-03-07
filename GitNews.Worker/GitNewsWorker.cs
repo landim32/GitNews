@@ -1,6 +1,5 @@
 using GitNews.Domain.Interfaces;
 using GitNews.DTO;
-using GitNews.Infra.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -53,7 +52,7 @@ public class GitNewsWorker : BackgroundService
                 using var scope = _serviceProvider.CreateScope();
                 var provider = scope.ServiceProvider;
 
-                var dbContext = provider.GetRequiredService<GitNewsDbContext>();
+                var dbContext = provider.GetRequiredService<DbContext>();
                 await dbContext.Database.MigrateAsync(stoppingToken);
                 _logger.LogInformation("Database updated");
 

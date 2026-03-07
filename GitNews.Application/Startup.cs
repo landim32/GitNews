@@ -1,16 +1,12 @@
 using GitNews.Domain.Interfaces;
-using GitNews.Domain.Models;
 using GitNews.Domain.Services;
 using GitNews.DTO;
+using GitNews.Infra;
 using GitNews.Infra.AppServices;
-using GitNews.Infra.Context;
 using GitNews.Infra.Interfaces.AppServices;
-using GitNews.Infra.Interfaces.Repository;
-using GitNews.Infra.Repository;
-using Microsoft.EntityFrameworkCore;
+using GitNews.Infra.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 
 namespace GitNews.Application;
 
@@ -41,21 +37,22 @@ public static class Startup
         // Logging
         services.AddLogging(builder => builder.AddConsole());
 
-        var dataSourceBuilder = new NpgsqlDataSourceBuilder(settings.Database.ConnectionString);
-        dataSourceBuilder.UseVector();
-        var dataSource = dataSourceBuilder.Build();
-
-        services.AddDbContext<GitNewsDbContext>(options =>
-            options.UseNpgsql(dataSource, o => o.UseVector()));
-
-        // Repositories
-        services.AddScoped<IProcessedCommitRepository<ProcessedCommit>, ProcessedCommitRepository>();
-        services.AddScoped<IArticleRepository<Article>, ArticleRepository>();
+        // Database provider
+        var provider = settings.Database.Provider?.Trim();
+        if (string.Equals(provider, "SQLite", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSqliteInfra(settings.Database.ConnectionString);
+        }
+        else
+        {
+            services.AddPostgreSqlInfra(settings.Database.ConnectionString);
+        }
 
         // AppServices
         services.AddSingleton<IGitHubAppService, GitHubAppService>();
         services.AddHttpClient<IBlogGeneratorAppService, BlogGeneratorAppService>();
         services.AddHttpClient<IEmbeddingAppService, EmbeddingAppService>();
+        services.AddHttpClient<IDallEAppService, DallEAppService>();
 
         // Domain Services
         services.AddScoped<IGitNewsProcessorService, GitNewsProcessorService>();

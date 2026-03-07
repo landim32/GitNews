@@ -27,7 +27,7 @@ GitNews.Worker   ─┤→ GitNews.Application → GitNews.Infra       → GitNe
 - **GitNews.Domain** — Entity models (`Article`, `ProcessedCommit`). No dependencies.
 - **GitNews.Infra** — Implementations: `GitHubAppService` (Octokit), `BlogGeneratorAppService` (OpenAI), `EmbeddingAppService`, `MarkdownWriterAppService`, `ProcessedCommitRepository`, `ArticleRepository`, `GitNewsDbContext` (PostgreSQL/pgvector). Depends on Domain, DTO, Infra.Interfaces.
 - **GitNews.Application** — `Startup.cs` with DI registration (`ConfigureServices` extension method), logging setup. Depends on all layers.
-- **GitNews.Console** — One-shot CLI entry point. Reads config from `appsettings.json`, environment variables (`GITNEWS_` prefix), and CLI args.
+- **GitNews.Console** — One-shot CLI entry point. Reads config from `appsettings.json`, environment variables (standard `__` convention, no prefix), and CLI args.
 - **GitNews.Worker** — Background worker that runs daily at a configured time (default 19:00). Uses `BackgroundService` with `Host.CreateApplicationBuilder`.
 
 ## Data Flow

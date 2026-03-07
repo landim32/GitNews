@@ -11,6 +11,7 @@
     <ProjectReference Include="..\GitNews.DTO\GitNews.DTO.csproj" />
     <ProjectReference Include="..\GitNews.Infra\GitNews.Infra.csproj" />
     <ProjectReference Include="..\GitNews.Infra.Interfaces\GitNews.Infra.Interfaces.csproj" />
+    <ProjectReference Include="..\GitNews.Infra.Sqlite\GitNews.Infra.Sqlite.csproj" />
   </ItemGroup>
 
   <ItemGroup>

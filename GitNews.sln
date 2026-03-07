@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GitNews.Infra.Interfaces", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GitNews.Worker", "GitNews.Worker\GitNews.Worker.csproj", "{24421D48-F22C-49DF-B923-F4B576905BA6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GitNews.Infra.Sqlite", "GitNews.Infra.Sqlite\GitNews.Infra.Sqlite.csproj", "{04BC608D-7FD3-4329-8FC1-53C2899F62ED}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -111,6 +113,18 @@ Global
 		{24421D48-F22C-49DF-B923-F4B576905BA6}.Release|x64.Build.0 = Release|Any CPU
 		{24421D48-F22C-49DF-B923-F4B576905BA6}.Release|x86.ActiveCfg = Release|Any CPU
 		{24421D48-F22C-49DF-B923-F4B576905BA6}.Release|x86.Build.0 = Release|Any CPU
+		{04BC608D-7FD3-4329-8FC1-53C2899F62ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04BC608D-7FD3-4329-8FC1-53C2899F62ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04BC608D-7FD3-4329-8FC1-53C2899F62ED}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{04BC608D-7FD3-4329-8FC1-53C2899F62ED}.Debug|x64.Build.0 = Debug|Any CPU
+		{04BC608D-7FD3-4329-8FC1-53C2899F62ED}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{04BC608D-7FD3-4329-8FC1-53C2899F62ED}.Debug|x86.Build.0 = Debug|Any CPU
+		{04BC608D-7FD3-4329-8FC1-53C2899F62ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04BC608D-7FD3-4329-8FC1-53C2899F62ED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{04BC608D-7FD3-4329-8FC1-53C2899F62ED}.Release|x64.ActiveCfg = Release|Any CPU
+		{04BC608D-7FD3-4329-8FC1-53C2899F62ED}.Release|x64.Build.0 = Release|Any CPU
+		{04BC608D-7FD3-4329-8FC1-53C2899F62ED}.Release|x86.ActiveCfg = Release|Any CPU
+		{04BC608D-7FD3-4329-8FC1-53C2899F62ED}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

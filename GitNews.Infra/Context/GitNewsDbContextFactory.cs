@@ -15,7 +15,11 @@ public class GitNewsDbContextFactory : IDesignTimeDbContextFactory<GitNewsDbCont
             .Build();
 
         var connectionString = configuration["Database:ConnectionString"]
-            ?? throw new InvalidOperationException("Connection string 'Database:ConnectionString' não encontrada no appsettings.json.");
+            ?? "Host=localhost;Port=5432;Database=gitnews;Username=postgres;Password=postgres";
+
+        // Design-time factory is PostgreSQL only — skip if connection string is for SQLite
+        if (connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase))
+            connectionString = "Host=localhost;Port=5432;Database=gitnews;Username=postgres;Password=postgres";
 
         var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
         dataSourceBuilder.UseVector();

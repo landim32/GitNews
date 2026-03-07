@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/node_modules/
+.git/
+.env
+*.user
+*.suo
+GitNews.Console/appsettings.json
+GitNews.Worker/appsettings.json
+GitNews.Console/output/
