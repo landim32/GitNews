@@ -54,6 +54,7 @@ public static class Startup
         services.AddHttpClient<IEmbeddingAppService, EmbeddingAppService>();
         services.AddHttpClient<IDallEAppService, DallEAppService>();
         services.AddSingleton<IMediumAppService, MediumAppService>();
+        services.AddSingleton<ILinkedInAppService, LinkedInAppService>();
 
         // Domain Services
         services.AddScoped<IGitNewsProcessorService, GitNewsProcessorService>();

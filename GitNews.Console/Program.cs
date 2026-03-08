@@ -73,6 +73,12 @@ class Program
                     return published ? 0 : 1;
                 }
 
+                if (command == "publish-linkedin")
+                {
+                    var published = await processor.PublishOldestUnprocessedToLinkedInAsync();
+                    return published ? 0 : 1;
+                }
+
                 var result = await processor.ProcessAllRepositoriesAsync();
                 await processor.GenerateMissingImagesAsync();
                 return result.HasErrors ? 1 : 0;
@@ -105,6 +111,8 @@ class Program
                 return "export";
             if (arg.Equals("--publish-medium", StringComparison.OrdinalIgnoreCase))
                 return "publish-medium";
+            if (arg.Equals("--publish-linkedin", StringComparison.OrdinalIgnoreCase))
+                return "publish-linkedin";
         }
         return null;
     }
@@ -122,6 +130,8 @@ class Program
                 case "--export":
                     break;
                 case "--publish-medium":
+                    break;
+                case "--publish-linkedin":
                     break;
                 case "--output-dir":
                     if (i + 1 < args.Length) i++;
@@ -197,6 +207,7 @@ class Program
         System.Console.WriteLine("  --export                    Export oldest unprocessed article to output/ (markdown + image)");
         System.Console.WriteLine("  --output-dir <dir>          Output directory for --export (default: ./output)");
         System.Console.WriteLine("  --publish-medium            Publish oldest unprocessed article to Medium via Chrome CDP");
+        System.Console.WriteLine("  --publish-linkedin          Publish oldest unprocessed article to LinkedIn via Chrome CDP");
         System.Console.WriteLine();
         System.Console.WriteLine("Options:");
         System.Console.WriteLine("  -o, --owner <owner>         GitHub account owner");
