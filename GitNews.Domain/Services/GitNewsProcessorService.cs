@@ -14,6 +14,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
     private readonly IBlogGeneratorAppService _blogGenerator;
     private readonly IEmbeddingAppService _embeddingService;
     private readonly IDallEAppService _dallEService;
+    private readonly IMediumAppService _mediumService;
     private readonly IProcessedCommitRepository<ProcessedCommit> _commitRepo;
     private readonly IArticleRepository<Article> _articleRepo;
     private readonly GitHubSettings _githubSettings;
@@ -24,6 +25,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         IBlogGeneratorAppService blogGenerator,
         IEmbeddingAppService embeddingService,
         IDallEAppService dallEService,
+        IMediumAppService mediumService,
         IProcessedCommitRepository<ProcessedCommit> commitRepo,
         IArticleRepository<Article> articleRepo,
         IOptions<GitHubSettings> githubSettings,
@@ -33,6 +35,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         _blogGenerator = blogGenerator;
         _embeddingService = embeddingService;
         _dallEService = dallEService;
+        _mediumService = mediumService;
         _commitRepo = commitRepo;
         _articleRepo = articleRepo;
         _githubSettings = githubSettings.Value;
@@ -278,5 +281,66 @@ public class GitNewsProcessorService : IGitNewsProcessorService
                 _logger.LogWarning(ex, "Failed to generate image for article: {Title}", article.Title);
             }
         }
+    }
+
+    public async Task<bool> PublishOldestUnprocessedToMediumAsync(CancellationToken cancellationToken = default)
+    {
+        var article = await _articleRepo.FindOldestUnprocessedAsync();
+
+        if (article == null)
+        {
+            _logger.LogInformation("No unprocessed articles found to publish");
+            return false;
+        }
+
+        _logger.LogInformation("Publishing to Medium: {Title}", article.Title);
+
+        // Ensure user is logged in
+        await _mediumService.EnsureLoggedInAsync(cancellationToken);
+
+        // Generate image if missing
+        if (string.IsNullOrWhiteSpace(article.ImageBase64))
+        {
+            _logger.LogInformation("Article has no image. Generating via DALL-E...");
+            try
+            {
+                var imagePrompt = $"Create a modern, minimalist tech blog header image about: {article.Title}. Style: flat design, vibrant colors, no text.";
+                article.ImageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to generate image");
+            }
+        }
+
+        // Prepare cover image bytes
+        byte[]? coverImage = null;
+        if (!string.IsNullOrWhiteSpace(article.ImageBase64))
+        {
+            coverImage = Convert.FromBase64String(article.ImageBase64);
+        }
+
+        // Parse tags
+        var tags = article.Tags
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Take(5)
+            .ToArray();
+
+        // Publish
+        var articleUrl = await _mediumService.PublishArticleAsync(
+            article.Title,
+            article.Content,
+            tags,
+            coverImage,
+            cancellationToken);
+
+        _logger.LogInformation("Article published on Medium: {Url}", articleUrl);
+
+        // Mark as processed
+        article.IsProcessed = true;
+        await _articleRepo.UpdateAsync(article);
+        _logger.LogInformation("Article marked as processed: {Title}", article.Title);
+
+        return true;
     }
 }

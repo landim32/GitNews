@@ -53,6 +53,7 @@ public static class Startup
         services.AddHttpClient<IBlogGeneratorAppService, BlogGeneratorAppService>();
         services.AddHttpClient<IEmbeddingAppService, EmbeddingAppService>();
         services.AddHttpClient<IDallEAppService, DallEAppService>();
+        services.AddSingleton<IMediumAppService, MediumAppService>();
 
         // Domain Services
         services.AddScoped<IGitNewsProcessorService, GitNewsProcessorService>();

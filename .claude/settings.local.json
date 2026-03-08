@@ -8,7 +8,8 @@
       "Bash(\"/c/Program Files/Docker/Docker/resources/bin/docker\" compose:*)",
       "Bash(dotnet run:*)",
       "Bash(dotnet:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(npx playwright:*)"
     ]
   }
 }

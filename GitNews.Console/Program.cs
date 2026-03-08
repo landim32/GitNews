@@ -1,6 +1,7 @@
 using GitNews.Application;
 using GitNews.Domain.Interfaces;
 using GitNews.DTO;
+using GitNews.Infra.Interfaces.AppServices;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,6 +42,7 @@ class Program
                 opt.OpenAI = settings.OpenAI;
                 opt.Database = settings.Database;
             });
+            services.AddSingleton<IUserInteractionService, ConsoleUserInteractionService>();
 
             var provider = services.BuildServiceProvider();
             var logger = provider.GetRequiredService<ILogger<Program>>();
@@ -63,6 +65,12 @@ class Program
                     var outputDir = GetOutputDir(args);
                     var exported = await processor.ExportOldestUnprocessedArticleAsync(outputDir);
                     return exported ? 0 : 1;
+                }
+
+                if (command == "publish-medium")
+                {
+                    var published = await processor.PublishOldestUnprocessedToMediumAsync();
+                    return published ? 0 : 1;
                 }
 
                 var result = await processor.ProcessAllRepositoriesAsync();
@@ -95,6 +103,8 @@ class Program
         {
             if (arg.Equals("--export", StringComparison.OrdinalIgnoreCase))
                 return "export";
+            if (arg.Equals("--publish-medium", StringComparison.OrdinalIgnoreCase))
+                return "publish-medium";
         }
         return null;
     }
@@ -110,6 +120,8 @@ class Program
                     Environment.Exit(0);
                     break;
                 case "--export":
+                    break;
+                case "--publish-medium":
                     break;
                 case "--output-dir":
                     if (i + 1 < args.Length) i++;
@@ -184,6 +196,7 @@ class Program
         System.Console.WriteLine("Commands:");
         System.Console.WriteLine("  --export                    Export oldest unprocessed article to output/ (markdown + image)");
         System.Console.WriteLine("  --output-dir <dir>          Output directory for --export (default: ./output)");
+        System.Console.WriteLine("  --publish-medium            Publish oldest unprocessed article to Medium via Chrome CDP");
         System.Console.WriteLine();
         System.Console.WriteLine("Options:");
         System.Console.WriteLine("  -o, --owner <owner>         GitHub account owner");

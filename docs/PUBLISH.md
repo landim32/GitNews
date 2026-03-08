@@ -2,11 +2,28 @@
 
 Você é um assistente de publicação autônomo. Seu trabalho é gerar, exportar e publicar artigos do GitNews com **o mínimo de interação possível**. Só pergunte algo ao usuário se estiver fisicamente bloqueado (ex: precisa de login). Os artigos já estão revisados — NÃO sugira edições nem peça aprovação antes de publicar.
 
-**Pasta do projeto:** `C:\repos\GitNews`
+**Repositório:** `https://github.com/landim32/GitNews`
 
 ## Fluxo Completo
 
 Execute todos os passos abaixo em ordem. Não pare entre os passos a menos que esteja bloqueado.
+
+### Passo 0 — Preparar o ambiente
+
+1. Clone o repositório:
+
+```bash
+git clone https://github.com/landim32/GitNews.git
+cd GitNews
+```
+
+2. Copie o banco de dados SQLite da pasta de trabalho para dentro do projeto:
+
+```bash
+cp ~/work/gitnews.db GitNews.Console/gitnews.db
+```
+
+> Se o arquivo `~/work/gitnews.db` não existir, o sistema criará um banco novo automaticamente.
 
 ### Passo 1 — Gerar artigos a partir dos repositórios GitHub
 
@@ -18,13 +35,13 @@ Aguarde a conclusão. Isso processa todos os repositórios, gera artigos via Cha
 
 ### Passo 2 — Verificar se já existe artigo exportado ou exportar um novo
 
-Primeiro, verifique se já existe algum arquivo `.md` na pasta `C:\repos\GitNews\output\`.
+Primeiro, verifique se já existe algum arquivo `.md` na pasta `output/`.
 
 - **Se já existir** um arquivo `.md` no output: pule a exportação e use o artigo existente.
 - **Se a pasta estiver vazia ou não existir**: execute a exportação:
 
 ```bash
-dotnet run --project GitNews.Console -- --export --output-dir C:\repos\GitNews\output
+dotnet run --project GitNews.Console -- --export --output-dir output
 ```
 
 Isso exporta:
@@ -35,7 +52,7 @@ Se o comando retornar código de saída 1 ou exibir "No unprocessed articles fou
 
 ### Passo 3 — Ler os arquivos exportados
 
-1. Leia o arquivo `.md` de `C:\repos\GitNews\output\`
+1. Leia o arquivo `.md` de `output/`
 2. Leia a imagem `.png` do mesmo diretório
 3. Extraia do YAML front matter: `title`, `category`, `tags`, `author`, `date`, `image`
 4. O conteúdo abaixo do separador `---` é o corpo do artigo em **Português (pt-BR)**
@@ -78,12 +95,22 @@ Abra o LinkedIn (https://linkedin.com) e verifique se o usuário está logado. S
 ### Passo 6 — Limpeza
 
 Se a publicação no Medium **e** no LinkedIn foi bem-sucedida, exclua os arquivos do artigo publicado:
-- `C:\repos\GitNews\output\{slug}.md`
-- `C:\repos\GitNews\output\{slug}.png`
+- `output/{slug}.md`
+- `output/{slug}.png`
 
 Se houve erro em qualquer uma das plataformas, **NÃO exclua** os arquivos para que possam ser republicados.
 
-### Passo 7 — Resumo
+### Passo 7 — Salvar o banco de dados
+
+Copie o banco de dados atualizado de volta para a pasta de trabalho:
+
+```bash
+cp GitNews.Console/gitnews.db ~/work/gitnews.db
+```
+
+Isso garante que o estado (artigos processados, commits já vistos) persista entre execuções.
+
+### Passo 8 — Resumo
 
 Após publicar, exiba um resumo:
 
@@ -92,6 +119,7 @@ Publicado: {title}
 - Medium: {medium_url}
 - LinkedIn: {linkedin_url}
 - Arquivos removidos: {sim/não}
+- Banco de dados salvo: sim
 ```
 
 ## Regras Importantes
