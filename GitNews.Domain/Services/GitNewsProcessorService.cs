@@ -16,6 +16,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
     private readonly IDallEAppService _dallEService;
     private readonly IMediumAppService _mediumService;
     private readonly ILinkedInAppService _linkedInService;
+    private readonly INNewsAppService _nnewsService;
     private readonly IProcessedCommitRepository<ProcessedCommit> _commitRepo;
     private readonly IArticleRepository<Article> _articleRepo;
     private readonly GitHubSettings _githubSettings;
@@ -28,6 +29,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         IDallEAppService dallEService,
         IMediumAppService mediumService,
         ILinkedInAppService linkedInService,
+        INNewsAppService nnewsService,
         IProcessedCommitRepository<ProcessedCommit> commitRepo,
         IArticleRepository<Article> articleRepo,
         IOptions<GitHubSettings> githubSettings,
@@ -39,6 +41,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         _dallEService = dallEService;
         _mediumService = mediumService;
         _linkedInService = linkedInService;
+        _nnewsService = nnewsService;
         _commitRepo = commitRepo;
         _articleRepo = articleRepo;
         _githubSettings = githubSettings.Value;
@@ -399,6 +402,64 @@ public class GitNewsProcessorService : IGitNewsProcessorService
             cancellationToken);
 
         _logger.LogInformation("Article published on LinkedIn: {Url}", articleUrl);
+
+        // Mark as processed
+        article.IsProcessed = true;
+        await _articleRepo.UpdateAsync(article);
+        _logger.LogInformation("Article marked as processed: {Title}", article.Title);
+
+        return true;
+    }
+
+    public async Task<bool> PublishOldestUnprocessedToNNewsAsync(CancellationToken cancellationToken = default)
+    {
+        var article = await _articleRepo.FindOldestUnprocessedAsync();
+
+        if (article == null)
+        {
+            _logger.LogInformation("No unprocessed articles found to publish");
+            return false;
+        }
+
+        _logger.LogInformation("Publishing to NNews: {Title}", article.Title);
+
+        // Generate image if missing
+        byte[]? coverImage = null;
+        if (string.IsNullOrWhiteSpace(article.ImageBase64))
+        {
+            _logger.LogInformation("Article has no image. Generating via DALL-E...");
+            try
+            {
+                var imagePrompt = $"Create a modern, minimalist tech blog header image about: {article.Title}. Style: flat design, vibrant colors, no text.";
+                article.ImageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to generate image");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(article.ImageBase64))
+        {
+            coverImage = Convert.FromBase64String(article.ImageBase64);
+        }
+
+        // Parse tags
+        var tags = article.Tags
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Take(5)
+            .ToArray();
+
+        // Publish
+        var articleId = await _nnewsService.PublishArticleAsync(
+            article.Title,
+            article.Content,
+            article.Category,
+            tags,
+            coverImage,
+            cancellationToken);
+
+        _logger.LogInformation("Article published on NNews with ID: {ArticleId}", articleId);
 
         // Mark as processed
         article.IsProcessed = true;

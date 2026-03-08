@@ -23,6 +23,8 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
     <PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.2.0" />
+    <PackageReference Include="NNews" Version="0.3.6" />
+    <PackageReference Include="NAuth" Version="0.4.3" />
   </ItemGroup>
 
 </Project>
