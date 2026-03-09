@@ -9,4 +9,5 @@ public interface IGitNewsProcessorService
     Task<bool> ExportOldestUnprocessedArticleAsync(string outputDir, CancellationToken cancellationToken = default);
     Task<bool> PublishOldestUnprocessedToMediumAsync(CancellationToken cancellationToken = default);
     Task<bool> PublishOldestUnprocessedToLinkedInAsync(CancellationToken cancellationToken = default);
+    Task<bool> PublishOldestUnprocessedToNNewsAsync(CancellationToken cancellationToken = default);
 }

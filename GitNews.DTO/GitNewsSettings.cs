@@ -5,6 +5,7 @@ public class GitNewsSettings
     public GitHubSettings GitHub { get; set; } = new();
     public OpenAISettings OpenAI { get; set; } = new();
     public DatabaseSettings Database { get; set; } = new();
+    public NNewsSettings NNews { get; set; } = new();
 }
 
 public class GitHubSettings
@@ -29,6 +30,13 @@ public class DatabaseSettings
 {
     public string Provider { get; set; } = "PostgreSQL";
     public string ConnectionString { get; set; } = string.Empty;
+}
+
+public class NNewsSettings
+{
+    public string ApiUrl { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
 }
 
 public class WorkerSettings
