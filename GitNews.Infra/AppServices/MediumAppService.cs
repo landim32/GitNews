@@ -30,15 +30,8 @@ public class MediumAppService : IMediumAppService, IAsyncDisposable
         _browser = await _playwright.Chromium.ConnectOverCDPAsync("http://127.0.0.1:9222");
 
         var contexts = _browser.Contexts;
-        if (contexts.Count > 0 && contexts[0].Pages.Count > 0)
-        {
-            _page = contexts[0].Pages[0];
-        }
-        else
-        {
-            var context = contexts.Count > 0 ? contexts[0] : await _browser.NewContextAsync();
-            _page = await context.NewPageAsync();
-        }
+        var context = contexts.Count > 0 ? contexts[0] : await _browser.NewContextAsync();
+        _page = await context.NewPageAsync();
 
         return _page;
     }
@@ -121,48 +114,29 @@ public class MediumAppService : IMediumAppService, IAsyncDisposable
         if (avatarOrMenu != null)
             return true;
 
-        // Fallback: try to access new story page
-        var currentUrl = page.Url;
-        await page.GotoAsync("https://medium.com/new-story", new PageGotoOptions
-        {
-            WaitUntil = WaitUntilState.DOMContentLoaded,
-            Timeout = 15000
-        });
-        await page.WaitForTimeoutAsync(2000);
+        // Fallback: check if the "Write" button is visible (only appears when logged in)
+        var writeButton = await page.QuerySelectorAsync("[data-testid='headerWriteButton'], a[href*='/new-story'], a:has-text('Write')");
+        if (writeButton != null && await writeButton.IsVisibleAsync())
+            return true;
 
-        var isOnEditor = page.Url.Contains("/new-story") || page.Url.Contains("/p/") || page.Url.Contains("write");
-        if (!isOnEditor)
-        {
-            // Was redirected to login — not logged in
-            await page.GotoAsync(currentUrl, new PageGotoOptions
-            {
-                WaitUntil = WaitUntilState.DOMContentLoaded,
-                Timeout = 15000
-            });
-            return false;
-        }
-
-        // Navigated to editor successfully — restore
-        await page.GotoAsync(currentUrl, new PageGotoOptions
-        {
-            WaitUntil = WaitUntilState.DOMContentLoaded,
-            Timeout = 15000
-        });
-        return true;
+        return false;
     }
 
     public async Task<string> PublishArticleAsync(string title, string markdownContent, string[] tags, byte[]? coverImage = null, CancellationToken cancellationToken = default)
     {
         var page = await GetPageAsync();
 
-        _logger.LogInformation("Navigating to Medium new story editor...");
-        await page.GotoAsync("https://medium.com/new-story", new PageGotoOptions
+        _logger.LogInformation("Navigating to Medium homepage...");
+        await page.GotoAsync("https://medium.com/", new PageGotoOptions
         {
             WaitUntil = WaitUntilState.DOMContentLoaded,
             Timeout = 30000
         });
 
         await page.WaitForTimeoutAsync(3000);
+
+        _logger.LogInformation("Clicking 'Write' button...");
+        await ClickWriteButtonAsync(page, cancellationToken);
 
         // Wait for editor to load
         _logger.LogInformation("Waiting for editor to load...");
@@ -227,12 +201,13 @@ public class MediumAppService : IMediumAppService, IAsyncDisposable
 
         // After user interaction, reload and retry
         _logger.LogInformation("Retrying to find the editor after user interaction...");
-        await page.GotoAsync("https://medium.com/new-story", new PageGotoOptions
+        await page.GotoAsync("https://medium.com/", new PageGotoOptions
         {
             WaitUntil = WaitUntilState.DOMContentLoaded,
             Timeout = 30000
         });
         await page.WaitForTimeoutAsync(3000);
+        await ClickWriteButtonAsync(page, cancellationToken);
 
         result = await TryFindTitleFieldAsync(page, selectors, maxAttempts: 10);
         if (result != null)
@@ -257,6 +232,34 @@ public class MediumAppService : IMediumAppService, IAsyncDisposable
         // Fallback: try finding any contenteditable element that looks like a title
         var fallback = await page.QuerySelectorAsync("[contenteditable='true']");
         return fallback;
+    }
+
+    private async Task ClickWriteButtonAsync(IPage page, CancellationToken cancellationToken = default)
+    {
+        var writeSelector = "[data-testid='headerWriteButton'], a[href*='/new-story'], a:has-text('Write')";
+
+        try
+        {
+            await page.WaitForSelectorAsync(writeSelector, new PageWaitForSelectorOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 15000
+            });
+
+            await page.ClickAsync(writeSelector);
+            _logger.LogInformation("Clicked 'Write' button");
+            await page.WaitForTimeoutAsync(3000);
+        }
+        catch (TimeoutException)
+        {
+            _logger.LogWarning("Could not find the 'Write' button on Medium.");
+
+            await _userInteraction.WaitForUserActionAsync(
+                "Could not find the 'Write' button. Please open the Medium editor manually in the Chrome browser window, then press Enter to continue...",
+                cancellationToken);
+
+            _logger.LogInformation("User opened the editor manually, proceeding...");
+        }
     }
 
     private async Task UploadCoverImageAsync(IPage page, byte[] imageBytes)

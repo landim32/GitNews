@@ -30,15 +30,8 @@ public class LinkedInAppService : ILinkedInAppService, IAsyncDisposable
         _browser = await _playwright.Chromium.ConnectOverCDPAsync("http://127.0.0.1:9222");
 
         var contexts = _browser.Contexts;
-        if (contexts.Count > 0 && contexts[0].Pages.Count > 0)
-        {
-            _page = contexts[0].Pages[0];
-        }
-        else
-        {
-            var context = contexts.Count > 0 ? contexts[0] : await _browser.NewContextAsync();
-            _page = await context.NewPageAsync();
-        }
+        var context = contexts.Count > 0 ? contexts[0] : await _browser.NewContextAsync();
+        _page = await context.NewPageAsync();
 
         return _page;
     }

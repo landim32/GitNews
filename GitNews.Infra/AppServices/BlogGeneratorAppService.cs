@@ -63,10 +63,14 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
         sb.AppendLine("## REGRAS PARA GERAÇÃO DO ARTIGO");
         sb.AppendLine();
         sb.AppendLine("1. **Cada novidade técnica identificada deve virar um tópico do artigo.**");
-        sb.AppendLine("2. **Para cada tópico, inclua trechos reais do código dos commits como exemplo** (use blocos de código Markdown).");
+        sb.AppendLine("2. **Para cada tópico, escreva exemplos de código originais inspirados no projeto** (use blocos de código Markdown).");
+        sb.AppendLine("   - Os exemplos devem ser trechos de código limpos, legíveis e que compilam/funcionam sozinhos.");
+        sb.AppendLine("   - NUNCA copie o código da seção de commits diretamente. Reescreva os trechos como exemplos didáticos.");
+        sb.AppendLine("   - NUNCA use formato diff, patches, ou linhas começando com +/-.");
+        sb.AppendLine("   - NUNCA inclua metadados de commit (sha, autor, data) no artigo.");
         sb.AppendLine("3. **Explique o que cada trecho faz e por que aquela abordagem foi escolhida.**");
         sb.AppendLine("4. **O título NÃO deve conter o nome do projeto/repositório.** Foque na técnica ou novidade (ex: 'Implementando Repository Pattern com EF Core').");
-        sb.AppendLine("5. **O artigo deve ter entre 500 e 800 palavras.** Seja conciso mas completo.");
+        sb.AppendLine("5. **O artigo deve ter entre 800 e 1200 palavras.** Seja detalhado e completo.");
         sb.AppendLine();
 
         if (isNewProject)
@@ -128,9 +132,14 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
 
                     if (!string.IsNullOrEmpty(file.Patch) && sb.Length < maxPromptLength)
                     {
-                        sb.AppendLine("```diff");
-                        sb.AppendLine(TruncateText(file.Patch, 300));
-                        sb.AppendLine("```");
+                        var addedCode = ExtractAddedCode(file.Patch);
+                        if (!string.IsNullOrWhiteSpace(addedCode))
+                        {
+                            var extension = Path.GetExtension(file.FileName).TrimStart('.');
+                            sb.AppendLine($"```{extension}");
+                            sb.AppendLine(TruncateText(addedCode, 500));
+                            sb.AppendLine("```");
+                        }
                     }
                 }
                 sb.AppendLine();
@@ -289,6 +298,15 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
         }
 
         return result.ToString();
+    }
+
+    private static string ExtractAddedCode(string patch)
+    {
+        var lines = patch.Split('\n')
+            .Where(line => line.StartsWith('+') && !line.StartsWith("+++"))
+            .Select(line => line[1..]);
+
+        return string.Join('\n', lines).Trim();
     }
 
     private static string TruncateText(string text, int maxLength)

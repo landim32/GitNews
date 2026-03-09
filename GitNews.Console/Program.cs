@@ -20,6 +20,12 @@ class Program
 
         try
         {
+            if (args.Length == 0)
+            {
+                PrintHelp();
+                return 0;
+            }
+
             var configuration = new ConfigurationBuilder()
                 .SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
@@ -79,9 +85,17 @@ class Program
                     return published ? 0 : 1;
                 }
 
-                var result = await processor.ProcessAllRepositoriesAsync();
-                await processor.GenerateMissingImagesAsync();
-                return result.HasErrors ? 1 : 0;
+                if (command == "process")
+                {
+                    var result = await processor.ProcessAllRepositoriesAsync();
+                    await processor.GenerateMissingImagesAsync();
+                    return result.HasErrors ? 1 : 0;
+                }
+
+                System.Console.WriteLine("Error: No valid command specified.");
+                System.Console.WriteLine();
+                PrintHelp();
+                return 1;
             }
         }
         catch (Exception ex)
@@ -113,6 +127,8 @@ class Program
                 return "publish-medium";
             if (arg.Equals("--publish-linkedin", StringComparison.OrdinalIgnoreCase))
                 return "publish-linkedin";
+            if (arg.Equals("--process", StringComparison.OrdinalIgnoreCase))
+                return "process";
         }
         return null;
     }
@@ -132,6 +148,8 @@ class Program
                 case "--publish-medium":
                     break;
                 case "--publish-linkedin":
+                    break;
+                case "--process":
                     break;
                 case "--output-dir":
                     if (i + 1 < args.Length) i++;
@@ -204,6 +222,7 @@ class Program
         System.Console.WriteLine("Usage: GitNews.Console [options]");
         System.Console.WriteLine();
         System.Console.WriteLine("Commands:");
+        System.Console.WriteLine("  --process                   Process all repositories and generate articles");
         System.Console.WriteLine("  --export                    Export oldest unprocessed article to output/ (markdown + image)");
         System.Console.WriteLine("  --output-dir <dir>          Output directory for --export (default: ./output)");
         System.Console.WriteLine("  --publish-medium            Publish oldest unprocessed article to Medium via Chrome CDP");
@@ -228,9 +247,12 @@ class Program
         System.Console.WriteLine();
         System.Console.WriteLine("Examples:");
         System.Console.WriteLine("  # Process all repositories from an account:");
-        System.Console.WriteLine("  GitNews.Console --owner microsoft --github-token ghp_xxx --openai-key sk-xxx");
+        System.Console.WriteLine("  GitNews.Console --process --owner microsoft --github-token ghp_xxx --openai-key sk-xxx");
         System.Console.WriteLine();
         System.Console.WriteLine("  # Process with environment variables:");
-        System.Console.WriteLine("  GitHub__Owner=microsoft GitNews.Console --github-token ghp_xxx --openai-key sk-xxx");
+        System.Console.WriteLine("  GitHub__Owner=microsoft GitNews.Console --process");
+        System.Console.WriteLine();
+        System.Console.WriteLine("  # Export an article:");
+        System.Console.WriteLine("  GitNews.Console --export --output-dir ./output");
     }
 }
