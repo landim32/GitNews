@@ -85,7 +85,12 @@ class Program
                     return published ? 0 : 1;
                 }
 
-<<<<<<< HEAD
+                if (command == "publish-nnews")
+                {
+                    var published = await processor.PublishOldestUnprocessedToNNewsAsync();
+                    return published ? 0 : 1;
+                }
+
                 if (command == "process")
                 {
                     var result = await processor.ProcessAllRepositoriesAsync();
@@ -97,17 +102,6 @@ class Program
                 System.Console.WriteLine();
                 PrintHelp();
                 return 1;
-=======
-                if (command == "publish-nnews")
-                {
-                    var published = await processor.PublishOldestUnprocessedToNNewsAsync();
-                    return published ? 0 : 1;
-                }
-
-                var result = await processor.ProcessAllRepositoriesAsync();
-                await processor.GenerateMissingImagesAsync();
-                return result.HasErrors ? 1 : 0;
->>>>>>> 1a9d418aa6aaaf597be34266ef188f027f957879
             }
         }
         catch (Exception ex)
@@ -139,13 +133,10 @@ class Program
                 return "publish-medium";
             if (arg.Equals("--publish-linkedin", StringComparison.OrdinalIgnoreCase))
                 return "publish-linkedin";
-<<<<<<< HEAD
-            if (arg.Equals("--process", StringComparison.OrdinalIgnoreCase))
-                return "process";
-=======
             if (arg.Equals("--publish-nnews", StringComparison.OrdinalIgnoreCase))
                 return "publish-nnews";
->>>>>>> 1a9d418aa6aaaf597be34266ef188f027f957879
+            if (arg.Equals("--process", StringComparison.OrdinalIgnoreCase))
+                return "process";
         }
         return null;
     }
@@ -166,11 +157,9 @@ class Program
                     break;
                 case "--publish-linkedin":
                     break;
-<<<<<<< HEAD
-                case "--process":
-=======
                 case "--publish-nnews":
->>>>>>> 1a9d418aa6aaaf597be34266ef188f027f957879
+                    break;
+                case "--process":
                     break;
                 case "--output-dir":
                     if (i + 1 < args.Length) i++;
