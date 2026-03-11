@@ -71,20 +71,24 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
         sb.AppendLine("3. **Explique o que cada trecho faz e por que aquela abordagem foi escolhida.**");
         sb.AppendLine("4. **O título NÃO deve conter o nome do projeto/repositório.** Foque na técnica ou novidade (ex: 'Implementando Repository Pattern com EF Core').");
         sb.AppendLine("5. **O artigo deve ter entre 800 e 1200 palavras.** Seja detalhado e completo.");
+        sb.AppendLine("6. **O foco do artigo é o assunto técnico, NÃO o projeto.** O projeto é apenas o contexto de onde a técnica foi observada.");
+        sb.AppendLine("   - Cite o nome do projeto **apenas uma vez**, preferencialmente no final do artigo, próximo a um exemplo prático do assunto.");
+        sb.AppendLine($"   - No final do artigo, inclua um parágrafo como: \"O projeto [nome] implementa essa abordagem no repositório [https://github.com/{context.Owner}/{context.Repository}](https://github.com/{context.Owner}/{context.Repository}).\"");
+        sb.AppendLine("   - NUNCA mencione commits específicos (sha, mensagem de commit, data de commit).");
+        sb.AppendLine("   - NÃO descreva o que é o projeto ou sua finalidade. O leitor deve aprender sobre a técnica, não sobre o projeto.");
         sb.AppendLine();
 
         if (isNewProject)
         {
-            sb.AppendLine("6. **Este é um projeto NOVO (primeiros commits).** Inclua uma seção inicial explicando o que o projeto faz, sua utilidade e propósito.");
+            sb.AppendLine("7. **Este é um projeto NOVO (primeiros commits).** Mesmo assim, foque nas técnicas utilizadas. Cite o projeto apenas uma vez no final.");
         }
         else
         {
-            sb.AppendLine("6. **NÃO faça um artigo sobre o que é o projeto.** Foque exclusivamente nas novidades técnicas encontradas nos commits recentes.");
-            sb.AppendLine("   O nome do projeto pode aparecer no conteúdo como contexto, mas o artigo deve ser sobre as técnicas/pacotes/patterns.");
+            sb.AppendLine("7. **NÃO faça um artigo sobre o que é o projeto.** Foque exclusivamente nas novidades técnicas encontradas nos commits recentes.");
         }
 
         sb.AppendLine();
-        sb.AppendLine("7. Se não encontrar nenhuma novidade técnica relevante nos commits, retorne um artigo com título \"Sem novidades\" e conteúdo vazio.");
+        sb.AppendLine("8. Se não encontrar nenhuma novidade técnica relevante nos commits, retorne um artigo com título \"Sem novidades\" e conteúdo vazio.");
         sb.AppendLine();
         sb.AppendLine("## FORMATO DE RESPOSTA");
         sb.AppendLine();
@@ -197,10 +201,21 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
 
     private BlogPostInfo ParseResponse(string response)
     {
-        var cleanJson = response
-            .Replace("```json", "")
-            .Replace("```", "")
-            .Trim();
+        var cleanJson = response.Trim();
+
+        // Remove only the wrapping code fences (```json ... ```) without affecting
+        // backticks inside the JSON content (e.g. markdown code blocks in the article).
+        if (cleanJson.StartsWith("```"))
+        {
+            var firstNewline = cleanJson.IndexOf('\n');
+            if (firstNewline >= 0)
+                cleanJson = cleanJson[(firstNewline + 1)..];
+        }
+        if (cleanJson.EndsWith("```"))
+        {
+            cleanJson = cleanJson[..cleanJson.LastIndexOf("```")];
+        }
+        cleanJson = cleanJson.Trim();
 
         try
         {

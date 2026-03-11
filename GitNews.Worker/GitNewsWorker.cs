@@ -58,7 +58,6 @@ public class GitNewsWorker : BackgroundService
 
                 var processor = provider.GetRequiredService<IGitNewsProcessorService>();
                 await processor.ProcessAllRepositoriesAsync(stoppingToken);
-                await processor.GenerateMissingImagesAsync(stoppingToken);
             }
             catch (Exception ex)
             {

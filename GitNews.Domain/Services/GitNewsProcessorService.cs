@@ -57,11 +57,18 @@ public class GitNewsProcessorService : IGitNewsProcessorService
 
         _logger.LogInformation("Total repositories to process: {Count}", repositories.Count);
 
+        var maxArticles = _githubSettings.MaxArticles;
         var result = new ProcessingResultInfo { TotalCount = repositories.Count };
 
         for (int i = 0; i < repositories.Count; i++)
         {
             if (cancellationToken.IsCancellationRequested) break;
+
+            if (result.SuccessCount >= maxArticles)
+            {
+                _logger.LogInformation("Reached maximum articles limit ({MaxArticles}). Stopping", maxArticles);
+                break;
+            }
 
             var repoName = repositories[i];
             _logger.LogInformation("[{Current}/{Total}] Processing: {Owner}/{Repo}",
@@ -69,11 +76,10 @@ public class GitNewsProcessorService : IGitNewsProcessorService
 
             try
             {
-                var processed = await ProcessRepositoryAsync(repoName, cancellationToken);
-                if (processed == null)
+                var articlesGenerated = await ProcessRepositoryCommitsAsync(repoName, maxArticles - result.SuccessCount, cancellationToken);
+                result.SuccessCount += articlesGenerated;
+                if (articlesGenerated == 0)
                     result.SkippedCount++;
-                else if (processed == true)
-                    result.SuccessCount++;
             }
             catch (Exception ex)
             {
@@ -88,9 +94,9 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         return result;
     }
 
-    private async Task<bool?> ProcessRepositoryAsync(string repoName, CancellationToken cancellationToken)
+    private async Task<int> ProcessRepositoryCommitsAsync(string repoName, int remainingArticles, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("[1/7] Collecting repository data...");
+        _logger.LogInformation("Collecting repository data...");
         var context = await _githubService.GetRepositoryContextAsync(
             _githubSettings.Owner,
             repoName,
@@ -99,91 +105,82 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         if (context.Commits.Count == 0)
         {
             _logger.LogInformation("No recent commits found. Skipping");
-            return null;
+            return 0;
         }
 
-        _logger.LogInformation("[2/7] Checking already processed commits...");
         var repoFullName = $"{_githubSettings.Owner}/{repoName}";
-        var unprocessedCommits = new List<CommitInfoDto>();
+        var articlesGenerated = 0;
 
         foreach (var commit in context.Commits)
         {
-            if (!await _commitRepo.IsCommitProcessedAsync(repoFullName, commit.Sha))
-                unprocessedCommits.Add(commit);
+            if (cancellationToken.IsCancellationRequested) break;
+            if (articlesGenerated >= remainingArticles) break;
+
+            if (await _commitRepo.IsCommitProcessedAsync(repoFullName, commit.Sha))
+                continue;
+
+            _logger.LogInformation("Processing commit {Sha}: {Message}", commit.Sha[..7], commit.Message);
+
+            // Mark commit as processed regardless of article generation
+            await _commitRepo.MarkAsProcessedAsync(repoFullName, new[] { commit.Sha });
+
+            // Build context with only this commit
+            var commitContext = new RepositoryContextInfo
+            {
+                Owner = context.Owner,
+                Repository = context.Repository,
+                ReadmeContent = context.ReadmeContent,
+                TotalCommitCount = context.TotalCommitCount,
+                Commits = new List<CommitInfoDto> { commit }
+            };
+
+            _logger.LogInformation("Generating blog article via ChatGPT...");
+            var blogPost = await _blogGenerator.GenerateBlogPostAsync(commitContext);
+
+            if (blogPost.Title.Contains("Sem novidades", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(blogPost.Content))
+            {
+                _logger.LogInformation("No technical novelties in commit {Sha}. Skipping", commit.Sha[..7]);
+                continue;
+            }
+
+            _logger.LogInformation("Generating article embedding...");
+            var embeddingText = $"{blogPost.Title} {blogPost.Content}";
+            var embedding = await _embeddingService.GenerateEmbeddingAsync(embeddingText);
+
+            _logger.LogInformation("Checking for similar articles...");
+            var similarArticles = await _articleRepo.FindSimilarAsync(embedding);
+
+            if (similarArticles.Count > 0)
+            {
+                _logger.LogInformation("Similar article already exists: \"{Title}\". Skipping", similarArticles[0].Title);
+                continue;
+            }
+
+            _logger.LogInformation("Title: {Title}", blogPost.Title);
+            _logger.LogInformation("Category: {Category}", blogPost.Category);
+            _logger.LogInformation("Tags: {Tags}", string.Join(", ", blogPost.Tags));
+
+            _logger.LogInformation("Saving article to database...");
+            var article = new Article
+            {
+                Title = blogPost.Title,
+                Content = blogPost.Content,
+                Category = blogPost.Category,
+                Tags = string.Join(", ", blogPost.Tags),
+                Repository = repoFullName,
+                Author = blogPost.Author,
+                Slug = blogPost.Slug,
+                Embedding = embedding,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _articleRepo.SaveAsync(article);
+            _logger.LogInformation("Article saved: {Title}", article.Title);
+
+            articlesGenerated++;
         }
 
-        if (unprocessedCommits.Count == 0)
-        {
-            _logger.LogInformation("All commits already processed. Skipping");
-            return null;
-        }
-
-        _logger.LogInformation("New commits: {NewCount} of {TotalCount}", unprocessedCommits.Count, context.Commits.Count);
-        context.Commits = unprocessedCommits;
-
-        _logger.LogInformation("Total commits in repo: {TotalCommitCount} ({ProjectType})",
-            context.TotalCommitCount,
-            context.TotalCommitCount <= 3 ? "new project" : "existing project");
-
-        _logger.LogInformation("[3/7] Generating blog article via ChatGPT...");
-        var blogPost = await _blogGenerator.GenerateBlogPostAsync(context);
-
-        await _commitRepo.MarkAsProcessedAsync(repoFullName, unprocessedCommits.Select(c => c.Sha));
-
-        if (blogPost.Title.Contains("Sem novidades", StringComparison.OrdinalIgnoreCase)
-            || string.IsNullOrWhiteSpace(blogPost.Content))
-        {
-            _logger.LogInformation("No technical novelties identified. Skipping");
-            return null;
-        }
-
-        _logger.LogInformation("[4/7] Generating article embedding...");
-        var embeddingText = $"{blogPost.Title} {blogPost.Content}";
-        var embedding = await _embeddingService.GenerateEmbeddingAsync(embeddingText);
-
-        _logger.LogInformation("[5/7] Checking for similar articles...");
-        var similarArticles = await _articleRepo.FindSimilarAsync(embedding);
-
-        if (similarArticles.Count > 0)
-        {
-            _logger.LogInformation("Similar article already exists: \"{Title}\". Skipping", similarArticles[0].Title);
-            return null;
-        }
-
-        _logger.LogInformation("Title: {Title}", blogPost.Title);
-        _logger.LogInformation("Category: {Category}", blogPost.Category);
-        _logger.LogInformation("Tags: {Tags}", string.Join(", ", blogPost.Tags));
-
-        _logger.LogInformation("[6/7] Generating article image via DALL-E...");
-        string? imageBase64 = null;
-        try
-        {
-            var imagePrompt = $"Create a modern, minimalist tech blog header image about: {blogPost.Title}. Style: flat design, vibrant colors, no text.";
-            imageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to generate image. Article will be saved without image");
-        }
-
-        _logger.LogInformation("[7/7] Saving article to database...");
-        var article = new Article
-        {
-            Title = blogPost.Title,
-            Content = blogPost.Content,
-            Category = blogPost.Category,
-            Tags = string.Join(", ", blogPost.Tags),
-            Repository = repoFullName,
-            Author = blogPost.Author,
-            Slug = blogPost.Slug,
-            Embedding = embedding,
-            ImageBase64 = imageBase64,
-            CreatedAt = DateTime.UtcNow
-        };
-        await _articleRepo.SaveAsync(article);
-        _logger.LogInformation("Article saved: {Title}", article.Title);
-
-        return true;
+        return articlesGenerated;
     }
 
     public async Task<bool> ExportOldestUnprocessedArticleAsync(string outputDir, CancellationToken cancellationToken = default)
@@ -205,19 +202,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
             slug = $"article-{article.Id}";
 
         // Generate image if missing
-        if (string.IsNullOrWhiteSpace(article.ImageBase64))
-        {
-            _logger.LogInformation("Article has no image. Generating via DALL-E...");
-            try
-            {
-                var imagePrompt = $"Create a modern, minimalist tech blog header image about: {article.Title}. Style: flat design, vibrant colors, no text.";
-                article.ImageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to generate image");
-            }
-        }
+        await EnsureArticleHasImageAsync(article);
 
         // Save image as PNG
         var imageFileName = $"{slug}.png";
@@ -256,36 +241,22 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         return true;
     }
 
-    public async Task GenerateMissingImagesAsync(CancellationToken cancellationToken = default)
+    private async Task EnsureArticleHasImageAsync(Article article)
     {
-        var articles = await _articleRepo.FindWithoutImageAsync();
-
-        if (articles.Count == 0)
-        {
-            _logger.LogInformation("All articles already have images");
+        if (!string.IsNullOrWhiteSpace(article.ImageBase64))
             return;
-        }
 
-        _logger.LogInformation("Found {Count} articles without images", articles.Count);
-
-        for (int i = 0; i < articles.Count; i++)
+        _logger.LogInformation("Article has no image. Generating via DALL-E...");
+        try
         {
-            if (cancellationToken.IsCancellationRequested) break;
-
-            var article = articles[i];
-            _logger.LogInformation("[{Current}/{Total}] Generating image for: {Title}", i + 1, articles.Count, article.Title);
-
-            try
-            {
-                var imagePrompt = $"Create a modern, minimalist tech blog header image about: {article.Title}. Style: flat design, vibrant colors, no text.";
-                article.ImageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
-                await _articleRepo.UpdateAsync(article);
-                _logger.LogInformation("Image saved for article: {Title}", article.Title);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to generate image for article: {Title}", article.Title);
-            }
+            var imagePrompt = $"Create a modern, minimalist tech blog header image about: {article.Title}. Style: flat design, vibrant colors, no text.";
+            article.ImageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
+            await _articleRepo.UpdateAsync(article);
+            _logger.LogInformation("Image saved for article: {Title}", article.Title);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to generate image for article: {Title}", article.Title);
         }
     }
 
@@ -305,19 +276,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         await _mediumService.EnsureLoggedInAsync(cancellationToken);
 
         // Generate image if missing
-        if (string.IsNullOrWhiteSpace(article.ImageBase64))
-        {
-            _logger.LogInformation("Article has no image. Generating via DALL-E...");
-            try
-            {
-                var imagePrompt = $"Create a modern, minimalist tech blog header image about: {article.Title}. Style: flat design, vibrant colors, no text.";
-                article.ImageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to generate image");
-            }
-        }
+        await EnsureArticleHasImageAsync(article);
 
         // Prepare cover image bytes
         byte[]? coverImage = null;
@@ -366,19 +325,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         await _linkedInService.EnsureLoggedInAsync(cancellationToken);
 
         // Generate image if missing
-        if (string.IsNullOrWhiteSpace(article.ImageBase64))
-        {
-            _logger.LogInformation("Article has no image. Generating via DALL-E...");
-            try
-            {
-                var imagePrompt = $"Create a modern, minimalist tech blog header image about: {article.Title}. Style: flat design, vibrant colors, no text.";
-                article.ImageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to generate image");
-            }
-        }
+        await EnsureArticleHasImageAsync(article);
 
         // Prepare cover image bytes
         byte[]? coverImage = null;
@@ -424,21 +371,9 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         _logger.LogInformation("Publishing to NNews: {Title}", article.Title);
 
         // Generate image if missing
-        byte[]? coverImage = null;
-        if (string.IsNullOrWhiteSpace(article.ImageBase64))
-        {
-            _logger.LogInformation("Article has no image. Generating via DALL-E...");
-            try
-            {
-                var imagePrompt = $"Create a modern, minimalist tech blog header image about: {article.Title}. Style: flat design, vibrant colors, no text.";
-                article.ImageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to generate image");
-            }
-        }
+        await EnsureArticleHasImageAsync(article);
 
+        byte[]? coverImage = null;
         if (!string.IsNullOrWhiteSpace(article.ImageBase64))
         {
             coverImage = Convert.FromBase64String(article.ImageBase64);

@@ -9,7 +9,9 @@
       "Bash(dotnet run:*)",
       "Bash(dotnet:*)",
       "Bash(mkdir:*)",
-      "Bash(npx playwright:*)"
+      "Bash(npx playwright:*)",
+      "Bash(python3:*)",
+      "Bash(ilspycmd:*)"
     ]
   }
 }

@@ -7,9 +7,10 @@ using GitNews.Infra.Interfaces.AppServices;
 using GitNews.Infra.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using GitNews.Infra.Handlers;
 using NAuth.ACL;
 using NAuth.ACL.Interfaces;
-using NAuth.DTO;
+using NAuth.DTO.Settings;
 using NNews.ACL;
 using NNews.ACL.Interfaces;
 using NNews.DTO.Settings;
@@ -47,14 +48,18 @@ public static class Startup
             opt.Password = settings.NNews.Password;
         });
 
+        var nnewsApiUrl = string.IsNullOrWhiteSpace(settings.NNews.ApiUrl)
+            ? "https://not-configured/"
+            : settings.NNews.ApiUrl;
+
         services.Configure<NNewsSetting>(opt =>
         {
-            opt.ApiUrl = settings.NNews.ApiUrl;
+            opt.ApiUrl = nnewsApiUrl;
         });
 
         services.Configure<NAuthSetting>(opt =>
         {
-            opt.ApiUrl = settings.NNews.ApiUrl;
+            opt.ApiUrl = nnewsApiUrl;
         });
 
         // Logging
@@ -78,8 +83,10 @@ public static class Startup
         services.AddHttpClient<IDallEAppService, DallEAppService>();
         services.AddSingleton<IMediumAppService, MediumAppService>();
         services.AddSingleton<ILinkedInAppService, LinkedInAppService>();
-        services.AddHttpClient<IArticleClient, ArticleClient>();
         services.AddHttpClient<IUserClient, UserClient>();
+        services.AddTransient<NNewsAuthHandler>();
+        services.AddHttpClient<IArticleClient, ArticleClient>()
+            .AddHttpMessageHandler<NNewsAuthHandler>();
         services.AddScoped<INNewsAppService, NNewsAppService>();
 
         // Domain Services

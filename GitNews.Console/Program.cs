@@ -94,7 +94,6 @@ class Program
                 if (command == "process")
                 {
                     var result = await processor.ProcessAllRepositoriesAsync();
-                    await processor.GenerateMissingImagesAsync();
                     return result.HasErrors ? 1 : 0;
                 }
 
@@ -177,8 +176,12 @@ class Program
                     if (i + 1 < args.Length) settings.OpenAI.Model = args[++i];
                     break;
                 case "--max-commits":
-                    if (i + 1 < args.Length && int.TryParse(args[++i], out var max))
-                        settings.GitHub.MaxCommits = max;
+                    if (i + 1 < args.Length && int.TryParse(args[++i], out var maxCommits))
+                        settings.GitHub.MaxCommits = maxCommits;
+                    break;
+                case "--max-articles":
+                    if (i + 1 < args.Length && int.TryParse(args[++i], out var maxArticles))
+                        settings.GitHub.MaxArticles = maxArticles;
                     break;
                 case "--include-forks":
                     settings.GitHub.IncludeForks = true;
@@ -245,6 +248,7 @@ class Program
         System.Console.WriteLine("  --openai-key <key>          OpenAI API key (ChatGPT)");
         System.Console.WriteLine("  -m, --model <model>         ChatGPT model (default: gpt-4)");
         System.Console.WriteLine("  --max-commits <n>           Max commits per repository (default: 30)");
+        System.Console.WriteLine("  --max-articles <n>          Max articles to generate per run (default: 3)");
         System.Console.WriteLine("  --include-forks             Include forked repositories");
         System.Console.WriteLine("  --connection-string <conn>  PostgreSQL connection string");
         System.Console.WriteLine("  -h, --help                  Show this help");

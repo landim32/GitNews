@@ -13,6 +13,7 @@ public class GitHubSettings
     public string Token { get; set; } = string.Empty;
     public string Owner { get; set; } = string.Empty;
     public int MaxCommits { get; set; } = 30;
+    public int MaxArticles { get; set; } = 3;
     /// <summary>
     /// Se true, inclui repositórios forkados. Padrão: false.
     /// </summary>
