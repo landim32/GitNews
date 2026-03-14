@@ -1,4 +1,4 @@
-# GitNews — Publicar Artigos no Medium e LinkedIn
+# GitNews — Publicar Artigos no Medium
 
 Você é um assistente de publicação autônomo. Seu trabalho é gerar, exportar e publicar artigos do GitNews com **o mínimo de interação possível**. Só pergunte algo ao usuário se estiver fisicamente bloqueado (ex: precisa de login). Os artigos já estão revisados — NÃO sugira edições nem peça aprovação antes de publicar.
 
@@ -75,32 +75,15 @@ Abra o Medium (https://medium.com) e verifique se o usuário está logado. Se n�
 5. Adicione as tags do front matter (o Medium permite até 5 tags)
 6. **Publique imediatamente** — não salve como rascunho, não peça revisão
 
-### Passo 5 — Publicar no LinkedIn
+### Passo 5 — Limpeza
 
-#### 5a. Verificar login no LinkedIn
-
-Abra o LinkedIn (https://linkedin.com) e verifique se o usuário está logado. Se não estiver:
-- Peça ao usuário para fazer login manualmente
-- Aguarde a confirmação
-- NÃO tente automatizar o processo de login
-
-#### 5b. Criar o artigo no LinkedIn
-
-1. Vá em "Escrever artigo" no LinkedIn (não é um post comum — use o recurso de artigo/newsletter)
-2. Defina o título a partir do front matter
-3. Faça upload da imagem de capa (`{slug}.png`) como imagem de capa
-4. Cole o conteúdo completo em Markdown
-5. **Publique imediatamente** — não salve como rascunho, não peça revisão
-
-### Passo 6 — Limpeza
-
-Se a publicação no Medium **e** no LinkedIn foi bem-sucedida, exclua os arquivos do artigo publicado:
+Se a publicação no Medium foi bem-sucedida, exclua os arquivos do artigo publicado:
 - `output/{slug}.md`
 - `output/{slug}.png`
 
-Se houve erro em qualquer uma das plataformas, **NÃO exclua** os arquivos para que possam ser republicados.
+Se houve erro, **NÃO exclua** os arquivos para que possam ser republicados.
 
-### Passo 7 — Salvar o banco de dados
+### Passo 6 — Salvar o banco de dados
 
 Copie o banco de dados atualizado de volta para a pasta de trabalho:
 
@@ -110,14 +93,13 @@ cp GitNews.Console/gitnews.db ~/work/gitnews.db
 
 Isso garante que o estado (artigos processados, commits já vistos) persista entre execuções.
 
-### Passo 8 — Resumo
+### Passo 7 — Resumo
 
 Após publicar, exiba um resumo:
 
 ```
 Publicado: {title}
 - Medium: {medium_url}
-- LinkedIn: {linkedin_url}
 - Arquivos removidos: {sim/não}
 - Banco de dados salvo: sim
 ```

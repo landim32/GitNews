@@ -79,12 +79,6 @@ class Program
                     return published ? 0 : 1;
                 }
 
-                if (command == "publish-linkedin")
-                {
-                    var published = await processor.PublishOldestUnprocessedToLinkedInAsync();
-                    return published ? 0 : 1;
-                }
-
                 if (command == "publish-nnews")
                 {
                     var published = await processor.PublishOldestUnprocessedToNNewsAsync();
@@ -130,8 +124,6 @@ class Program
                 return "export";
             if (arg.Equals("--publish-medium", StringComparison.OrdinalIgnoreCase))
                 return "publish-medium";
-            if (arg.Equals("--publish-linkedin", StringComparison.OrdinalIgnoreCase))
-                return "publish-linkedin";
             if (arg.Equals("--publish-nnews", StringComparison.OrdinalIgnoreCase))
                 return "publish-nnews";
             if (arg.Equals("--process", StringComparison.OrdinalIgnoreCase))
@@ -153,8 +145,6 @@ class Program
                 case "--export":
                     break;
                 case "--publish-medium":
-                    break;
-                case "--publish-linkedin":
                     break;
                 case "--publish-nnews":
                     break;
@@ -239,7 +229,6 @@ class Program
         System.Console.WriteLine("  --export                    Export oldest unprocessed article to output/ (markdown + image)");
         System.Console.WriteLine("  --output-dir <dir>          Output directory for --export (default: ./output)");
         System.Console.WriteLine("  --publish-medium            Publish oldest unprocessed article to Medium via Chrome CDP");
-        System.Console.WriteLine("  --publish-linkedin          Publish oldest unprocessed article to LinkedIn via Chrome CDP");
         System.Console.WriteLine("  --publish-nnews             Publish oldest unprocessed article to NNews API");
         System.Console.WriteLine();
         System.Console.WriteLine("Options:");

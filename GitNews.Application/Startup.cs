@@ -82,7 +82,6 @@ public static class Startup
         services.AddHttpClient<IEmbeddingAppService, EmbeddingAppService>();
         services.AddHttpClient<IDallEAppService, DallEAppService>();
         services.AddSingleton<IMediumAppService, MediumAppService>();
-        services.AddSingleton<ILinkedInAppService, LinkedInAppService>();
         services.AddHttpClient<IUserClient, UserClient>();
         services.AddTransient<NNewsAuthHandler>();
         services.AddHttpClient<IArticleClient, ArticleClient>()
