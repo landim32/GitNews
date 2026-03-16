@@ -59,6 +59,10 @@ public class GitNewsSqliteDbContext : DbContext
                 .HasColumnName("is_processed")
                 .HasDefaultValue(false);
 
+            entity.Property(e => e.IsPublishedToNNews)
+                .HasColumnName("is_published_to_nnews")
+                .HasDefaultValue(false);
+
             // SQLite has no vector type — store as BLOB
             entity.Property(e => e.Embedding)
                 .HasColumnName("embedding")

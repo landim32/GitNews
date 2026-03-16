@@ -73,6 +73,10 @@ public class GitNewsDbContext : DbContext
                 .HasColumnName("is_processed")
                 .HasDefaultValue(false);
 
+            entity.Property(e => e.IsPublishedToNNews)
+                .HasColumnName("is_published_to_nnews")
+                .HasDefaultValue(false);
+
             entity.Property(e => e.CreatedAt)
                 .HasColumnName("created_at")
                 .HasColumnType("timestamp with time zone")

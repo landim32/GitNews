@@ -46,61 +46,17 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
     private string BuildPrompt(RepositoryContextInfo context)
     {
         var isNewProject = context.TotalCommitCount <= 3;
-        var sb = new StringBuilder();
 
-        sb.AppendLine("Você é um redator técnico especializado em criar artigos de blog sobre desenvolvimento de software.");
-        sb.AppendLine();
-        sb.AppendLine("## SUA TAREFA");
-        sb.AppendLine();
-        sb.AppendLine("Analise os commits abaixo (incluindo os diffs de código) e identifique **novidades técnicas** implementadas, como:");
-        sb.AppendLine("- Novos pacotes/bibliotecas adicionados (NuGet, npm, pip, etc.)");
-        sb.AppendLine("- Design patterns aplicados (Repository, Factory, Strategy, etc.)");
-        sb.AppendLine("- Padrões arquiteturais (Clean Architecture, CQRS, Event Sourcing, etc.)");
-        sb.AppendLine("- Novas tecnologias ou frameworks integrados");
-        sb.AppendLine("- Técnicas de refatoração relevantes");
-        sb.AppendLine("- Configurações de infraestrutura (Docker, CI/CD, etc.)");
-        sb.AppendLine();
-        sb.AppendLine("## REGRAS PARA GERAÇÃO DO ARTIGO");
-        sb.AppendLine();
-        sb.AppendLine("1. **Cada novidade técnica identificada deve virar um tópico do artigo.**");
-        sb.AppendLine("2. **Para cada tópico, escreva exemplos de código originais inspirados no projeto** (use blocos de código Markdown).");
-        sb.AppendLine("   - Os exemplos devem ser trechos de código limpos, legíveis e que compilam/funcionam sozinhos.");
-        sb.AppendLine("   - NUNCA copie o código da seção de commits diretamente. Reescreva os trechos como exemplos didáticos.");
-        sb.AppendLine("   - NUNCA use formato diff, patches, ou linhas começando com +/-.");
-        sb.AppendLine("   - NUNCA inclua metadados de commit (sha, autor, data) no artigo.");
-        sb.AppendLine("3. **Explique o que cada trecho faz e por que aquela abordagem foi escolhida.**");
-        sb.AppendLine("4. **O título NÃO deve conter o nome do projeto/repositório.** Foque na técnica ou novidade (ex: 'Implementando Repository Pattern com EF Core').");
-        sb.AppendLine("5. **O artigo deve ter entre 800 e 1200 palavras.** Seja detalhado e completo.");
-        sb.AppendLine("6. **O foco do artigo é o assunto técnico, NÃO o projeto.** O projeto é apenas o contexto de onde a técnica foi observada.");
-        sb.AppendLine("   - Cite o nome do projeto **apenas uma vez**, preferencialmente no final do artigo, próximo a um exemplo prático do assunto.");
-        sb.AppendLine($"   - No final do artigo, inclua um parágrafo como: \"O projeto [nome] implementa essa abordagem no repositório [https://github.com/{context.Owner}/{context.Repository}](https://github.com/{context.Owner}/{context.Repository}).\"");
-        sb.AppendLine("   - NUNCA mencione commits específicos (sha, mensagem de commit, data de commit).");
-        sb.AppendLine("   - NÃO descreva o que é o projeto ou sua finalidade. O leitor deve aprender sobre a técnica, não sobre o projeto.");
-        sb.AppendLine();
+        var promptTemplate = LoadPromptTemplate();
+        var repoUrl = $"https://github.com/{context.Owner}/{context.Repository}";
+        var newProjectRule = isNewProject
+            ? "7. **Este é um projeto NOVO (primeiros commits).** Mesmo assim, foque nas técnicas utilizadas. Cite o projeto apenas uma vez no final."
+            : "7. **NÃO faça um artigo sobre o que é o projeto.** Foque exclusivamente nas novidades técnicas encontradas nos commits recentes.";
 
-        if (isNewProject)
-        {
-            sb.AppendLine("7. **Este é um projeto NOVO (primeiros commits).** Mesmo assim, foque nas técnicas utilizadas. Cite o projeto apenas uma vez no final.");
-        }
-        else
-        {
-            sb.AppendLine("7. **NÃO faça um artigo sobre o que é o projeto.** Foque exclusivamente nas novidades técnicas encontradas nos commits recentes.");
-        }
+        var sb = new StringBuilder(promptTemplate
+            .Replace("{{REPO_URL}}", repoUrl)
+            .Replace("{{NEW_PROJECT_RULE}}", newProjectRule));
 
-        sb.AppendLine();
-        sb.AppendLine("8. Se não encontrar nenhuma novidade técnica relevante nos commits, retorne um artigo com título \"Sem novidades\" e conteúdo vazio.");
-        sb.AppendLine();
-        sb.AppendLine("## FORMATO DE RESPOSTA");
-        sb.AppendLine();
-        sb.AppendLine("Responda EXATAMENTE neste formato JSON, sem texto adicional:");
-        sb.AppendLine("{");
-        sb.AppendLine("  \"title\": \"Título do artigo focado na novidade técnica principal\",");
-        sb.AppendLine("  \"content\": \"Conteúdo completo do artigo em Markdown, com trechos de código como exemplo\",");
-        sb.AppendLine("  \"category\": \"Categoria principal (ex: Arquitetura, Pacotes, Patterns, DevOps)\",");
-        sb.AppendLine("  \"tags\": [\"tag1\", \"tag2\", \"tag3\"]");
-        sb.AppendLine("}");
-        sb.AppendLine();
-        sb.AppendLine("---");
         sb.AppendLine();
         sb.AppendLine($"## Repositório: {context.Owner}/{context.Repository}");
         sb.AppendLine($"## Total de commits no repositório: {context.TotalCommitCount}");
@@ -153,7 +109,7 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
         sb.AppendLine("---");
         sb.AppendLine();
         sb.AppendLine("Escreva em português brasileiro.");
-        sb.AppendLine("Retorne APENAS o JSON, sem markdown code fences ao redor.");
+        sb.AppendLine("Retorne APENAS no formato especificado acima (TITLE/CATEGORY/TAGS + conteúdo Markdown).");
 
         return sb.ToString();
     }
@@ -165,7 +121,7 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
             model = _settings.Model,
             messages = new[]
             {
-                new { role = "system", content = "Você é um redator técnico que cria artigos de blog sobre projetos de software. Responda sempre em JSON válido." },
+                new { role = "system", content = "Você é um redator técnico que cria artigos de blog sobre projetos de software. Responda sempre em Markdown puro, nunca em JSON." },
                 new { role = "user", content = prompt }
             },
             temperature = 0.7,
@@ -201,54 +157,51 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
 
     private BlogPostInfo ParseResponse(string response)
     {
-        var cleanJson = response.Trim();
+        var text = response.Trim();
+        var lines = text.Split('\n');
 
-        // Remove only the wrapping code fences (```json ... ```) without affecting
-        // backticks inside the JSON content (e.g. markdown code blocks in the article).
-        if (cleanJson.StartsWith("```"))
-        {
-            var firstNewline = cleanJson.IndexOf('\n');
-            if (firstNewline >= 0)
-                cleanJson = cleanJson[(firstNewline + 1)..];
-        }
-        if (cleanJson.EndsWith("```"))
-        {
-            cleanJson = cleanJson[..cleanJson.LastIndexOf("```")];
-        }
-        cleanJson = cleanJson.Trim();
+        string title = "Sem título";
+        string category = "Tecnologia";
+        var tags = new List<string> { "desenvolvimento", "github" };
+        int contentStartLine = 0;
 
-        try
+        for (int i = 0; i < lines.Length; i++)
         {
-            var options = new JsonSerializerOptions
+            var line = lines[i].Trim();
+
+            if (line.StartsWith("TITLE:", StringComparison.OrdinalIgnoreCase))
             {
-                PropertyNameCaseInsensitive = true,
-                AllowTrailingCommas = true
-            };
-
-            cleanJson = FixJsonNewlines(cleanJson);
-
-            var parsed = JsonSerializer.Deserialize<BlogPostResponse>(cleanJson, options);
-
-            return new BlogPostInfo
+                title = line["TITLE:".Length..].Trim();
+                contentStartLine = i + 1;
+            }
+            else if (line.StartsWith("CATEGORY:", StringComparison.OrdinalIgnoreCase))
             {
-                Title = parsed?.Title ?? "Sem título",
-                Content = parsed?.Content ?? "Sem conteúdo",
-                Category = parsed?.Category ?? "Tecnologia",
-                Tags = parsed?.Tags ?? new List<string> { "desenvolvimento", "github" }
-            };
+                category = line["CATEGORY:".Length..].Trim();
+                contentStartLine = i + 1;
+            }
+            else if (line.StartsWith("TAGS:", StringComparison.OrdinalIgnoreCase))
+            {
+                var tagsStr = line["TAGS:".Length..].Trim();
+                tags = tagsStr.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList();
+                contentStartLine = i + 1;
+            }
+            else if (!string.IsNullOrWhiteSpace(line))
+            {
+                // First non-metadata, non-empty line — content starts here
+                contentStartLine = i;
+                break;
+            }
         }
-        catch (JsonException ex)
+
+        var content = string.Join('\n', lines.Skip(contentStartLine)).Trim();
+
+        return new BlogPostInfo
         {
-            _logger.LogWarning(ex, "Failed to parse JSON response. Using raw response as content");
-
-            return new BlogPostInfo
-            {
-                Title = "Atualização do Projeto",
-                Content = response,
-                Category = "Tecnologia",
-                Tags = new List<string> { "desenvolvimento", "github" }
-            };
-        }
+            Title = title,
+            Content = content,
+            Category = category,
+            Tags = tags
+        };
     }
 
     private static string GenerateSlug(string title)
@@ -270,51 +223,6 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
         return cleanSlug.Trim('-');
     }
 
-    private static string FixJsonNewlines(string json)
-    {
-        var result = new StringBuilder(json.Length);
-        bool insideString = false;
-        bool escaped = false;
-
-        for (int i = 0; i < json.Length; i++)
-        {
-            char c = json[i];
-
-            if (escaped)
-            {
-                result.Append(c);
-                escaped = false;
-                continue;
-            }
-
-            if (c == '\\' && insideString)
-            {
-                result.Append(c);
-                escaped = true;
-                continue;
-            }
-
-            if (c == '"')
-            {
-                insideString = !insideString;
-                result.Append(c);
-                continue;
-            }
-
-            if (insideString && (c == '\n' || c == '\r'))
-            {
-                if (c == '\r' && i + 1 < json.Length && json[i + 1] == '\n')
-                    i++;
-                result.Append("\\n");
-                continue;
-            }
-
-            result.Append(c);
-        }
-
-        return result.ToString();
-    }
-
     private static string ExtractAddedCode(string patch)
     {
         var lines = patch.Split('\n')
@@ -322,6 +230,25 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
             .Select(line => line[1..]);
 
         return string.Join('\n', lines).Trim();
+    }
+
+    private static string LoadPromptTemplate()
+    {
+        var candidates = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "blog-prompt.md"),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "blog-prompt.md"),
+            Path.Combine(Directory.GetCurrentDirectory(), "blog-prompt.md"),
+        };
+
+        foreach (var path in candidates)
+        {
+            var fullPath = Path.GetFullPath(path);
+            if (File.Exists(fullPath))
+                return File.ReadAllText(fullPath);
+        }
+
+        throw new FileNotFoundException("blog-prompt.md not found. Ensure it exists in the project root.");
     }
 
     private static string TruncateText(string text, int maxLength)
@@ -351,21 +278,6 @@ internal class ChatMessage
 {
     [JsonPropertyName("content")]
     public string? Content { get; set; }
-}
-
-internal class BlogPostResponse
-{
-    [JsonPropertyName("title")]
-    public string? Title { get; set; }
-
-    [JsonPropertyName("content")]
-    public string? Content { get; set; }
-
-    [JsonPropertyName("category")]
-    public string? Category { get; set; }
-
-    [JsonPropertyName("tags")]
-    public List<string>? Tags { get; set; }
 }
 
 #endregion

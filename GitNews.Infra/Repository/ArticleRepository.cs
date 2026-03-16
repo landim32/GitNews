@@ -45,6 +45,14 @@ public class ArticleRepository : IArticleRepository<Article>
             .FirstOrDefaultAsync();
     }
 
+    public async Task<Article?> FindOldestUnpublishedToNNewsAsync()
+    {
+        return await _context.Articles
+            .Where(a => !a.IsPublishedToNNews)
+            .OrderBy(a => a.CreatedAt)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<List<Article>> FindSimilarAsync(float[] embedding, double threshold = 0.85, int limit = 3)
     {
         var vector = new Vector(embedding);

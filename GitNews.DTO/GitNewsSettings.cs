@@ -36,8 +36,10 @@ public class DatabaseSettings
 public class NNewsSettings
 {
     public string ApiUrl { get; set; } = string.Empty;
+    public string AuthUrl { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
 }
 
 public class WorkerSettings

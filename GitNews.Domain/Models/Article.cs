@@ -13,5 +13,6 @@ public class Article
     public float[]? Embedding { get; set; }
     public string? ImageBase64 { get; set; }
     public bool IsProcessed { get; set; } = false;
+    public bool IsPublishedToNNews { get; set; } = false;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

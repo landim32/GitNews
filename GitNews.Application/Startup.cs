@@ -44,13 +44,19 @@ public static class Startup
         services.Configure<NNewsSettings>(opt =>
         {
             opt.ApiUrl = settings.NNews.ApiUrl;
+            opt.AuthUrl = settings.NNews.AuthUrl;
             opt.Email = settings.NNews.Email;
             opt.Password = settings.NNews.Password;
+            opt.TenantId = settings.NNews.TenantId;
         });
 
         var nnewsApiUrl = string.IsNullOrWhiteSpace(settings.NNews.ApiUrl)
             ? "https://not-configured/"
-            : settings.NNews.ApiUrl;
+            : settings.NNews.ApiUrl.TrimEnd('/') + "/";
+
+        var nauthApiUrl = string.IsNullOrWhiteSpace(settings.NNews.AuthUrl)
+            ? "https://not-configured/"
+            : settings.NNews.AuthUrl.TrimEnd('/') + "/";
 
         services.Configure<NNewsSetting>(opt =>
         {
@@ -59,7 +65,7 @@ public static class Startup
 
         services.Configure<NAuthSetting>(opt =>
         {
-            opt.ApiUrl = nnewsApiUrl;
+            opt.ApiUrl = nauthApiUrl;
         });
 
         // Logging
@@ -82,11 +88,21 @@ public static class Startup
         services.AddHttpClient<IEmbeddingAppService, EmbeddingAppService>();
         services.AddHttpClient<IDallEAppService, DallEAppService>();
         services.AddSingleton<IMediumAppService, MediumAppService>();
-        services.AddHttpClient<IUserClient, UserClient>();
+        services.AddSingleton<ICodeImageAppService, CodeImageAppService>();
+        services.AddSingleton<NNewsTokenStore>();
+        services.AddTransient<NNewsTenantHandler>();
         services.AddTransient<NNewsAuthHandler>();
+        services.AddHttpClient<IUserClient, UserClient>()
+            .AddHttpMessageHandler<NNewsTenantHandler>();
         services.AddHttpClient<IArticleClient, ArticleClient>()
+            .AddHttpMessageHandler<NNewsTenantHandler>()
             .AddHttpMessageHandler<NNewsAuthHandler>();
-        services.AddScoped<INNewsAppService, NNewsAppService>();
+        services.AddHttpClient<ICategoryClient, CategoryClient>()
+            .AddHttpMessageHandler<NNewsTenantHandler>()
+            .AddHttpMessageHandler<NNewsAuthHandler>();
+        services.AddHttpClient<INNewsAppService, NNewsAppService>()
+            .AddHttpMessageHandler<NNewsTenantHandler>()
+            .AddHttpMessageHandler<NNewsAuthHandler>();
 
         // Domain Services
         services.AddScoped<IGitNewsProcessorService, GitNewsProcessorService>();

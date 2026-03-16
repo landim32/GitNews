@@ -11,16 +11,18 @@ public class NNewsAuthHandler : DelegatingHandler
 {
     private readonly IUserClient _userClient;
     private readonly NNewsSettings _settings;
+    private readonly NNewsTokenStore _tokenStore;
     private readonly ILogger<NNewsAuthHandler> _logger;
-    private string? _cachedToken;
 
     public NNewsAuthHandler(
         IUserClient userClient,
         IOptions<NNewsSettings> settings,
+        NNewsTokenStore tokenStore,
         ILogger<NNewsAuthHandler> logger)
     {
         _userClient = userClient;
         _settings = settings.Value;
+        _tokenStore = tokenStore;
         _logger = logger;
     }
 
@@ -28,7 +30,7 @@ public class NNewsAuthHandler : DelegatingHandler
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(_cachedToken))
+        if (string.IsNullOrEmpty(_tokenStore.Token))
         {
             _logger.LogInformation("Authenticating with NAuth...");
 
@@ -42,11 +44,11 @@ public class NNewsAuthHandler : DelegatingHandler
             if (result == null || string.IsNullOrEmpty(result.Token))
                 throw new InvalidOperationException("Failed to authenticate with NAuth. Check your email and password settings.");
 
-            _cachedToken = result.Token;
+            _tokenStore.Token = result.Token;
             _logger.LogInformation("Successfully authenticated with NAuth");
         }
 
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _cachedToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _tokenStore.Token);
         return await base.SendAsync(request, cancellationToken);
     }
 }

@@ -70,6 +70,12 @@ namespace GitNews.Infra.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_processed");
 
+                    b.Property<bool>("IsPublishedToNNews")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_published_to_nnews");
+
                     b.Property<string>("Repository")
                         .IsRequired()
                         .HasMaxLength(500)

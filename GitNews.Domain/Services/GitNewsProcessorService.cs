@@ -14,6 +14,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
     private readonly IBlogGeneratorAppService _blogGenerator;
     private readonly IEmbeddingAppService _embeddingService;
     private readonly IDallEAppService _dallEService;
+    private readonly ICodeImageAppService _codeImageService;
     private readonly IMediumAppService _mediumService;
     private readonly INNewsAppService _nnewsService;
     private readonly IProcessedCommitRepository<ProcessedCommit> _commitRepo;
@@ -26,6 +27,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         IBlogGeneratorAppService blogGenerator,
         IEmbeddingAppService embeddingService,
         IDallEAppService dallEService,
+        ICodeImageAppService codeImageService,
         IMediumAppService mediumService,
         INNewsAppService nnewsService,
         IProcessedCommitRepository<ProcessedCommit> commitRepo,
@@ -37,6 +39,7 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         _blogGenerator = blogGenerator;
         _embeddingService = embeddingService;
         _dallEService = dallEService;
+        _codeImageService = codeImageService;
         _mediumService = mediumService;
         _nnewsService = nnewsService;
         _commitRepo = commitRepo;
@@ -243,17 +246,28 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         if (!string.IsNullOrWhiteSpace(article.ImageBase64))
             return;
 
-        _logger.LogInformation("Article has no image. Generating via DALL-E...");
+        _logger.LogInformation("Article has no image. Generating code image via Germanium...");
         try
         {
-            var imagePrompt = $"Create a modern, minimalist tech blog header image about: {article.Title}. Style: flat design, vibrant colors, no text.";
-            article.ImageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
+            var imageBytes = await _codeImageService.GenerateImageFromMarkdownAsync(article.Content);
+            article.ImageBase64 = Convert.ToBase64String(imageBytes);
             await _articleRepo.UpdateAsync(article);
-            _logger.LogInformation("Image saved for article: {Title}", article.Title);
+            _logger.LogInformation("Code image saved for article: {Title}", article.Title);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to generate image for article: {Title}", article.Title);
+            _logger.LogWarning(ex, "Failed to generate code image for article: {Title}. Falling back to DALL-E...", article.Title);
+            try
+            {
+                var imagePrompt = $"Create a modern, minimalist tech blog header image about: {article.Title}. Style: flat design, vibrant colors, no text.";
+                article.ImageBase64 = await _dallEService.GenerateImageBase64Async(imagePrompt);
+                await _articleRepo.UpdateAsync(article);
+                _logger.LogInformation("DALL-E image saved for article: {Title}", article.Title);
+            }
+            catch (Exception fallbackEx)
+            {
+                _logger.LogWarning(fallbackEx, "Failed to generate image for article: {Title}", article.Title);
+            }
         }
     }
 
@@ -308,11 +322,11 @@ public class GitNewsProcessorService : IGitNewsProcessorService
 
     public async Task<bool> PublishOldestUnprocessedToNNewsAsync(CancellationToken cancellationToken = default)
     {
-        var article = await _articleRepo.FindOldestUnprocessedAsync();
+        var article = await _articleRepo.FindOldestUnpublishedToNNewsAsync();
 
         if (article == null)
         {
-            _logger.LogInformation("No unprocessed articles found to publish");
+            _logger.LogInformation("No unpublished articles found for NNews");
             return false;
         }
 
@@ -344,10 +358,10 @@ public class GitNewsProcessorService : IGitNewsProcessorService
 
         _logger.LogInformation("Article published on NNews with ID: {ArticleId}", articleId);
 
-        // Mark as processed
-        article.IsProcessed = true;
+        // Mark as published to NNews
+        article.IsPublishedToNNews = true;
         await _articleRepo.UpdateAsync(article);
-        _logger.LogInformation("Article marked as processed: {Title}", article.Title);
+        _logger.LogInformation("Article marked as published to NNews: {Title}", article.Title);
 
         return true;
     }

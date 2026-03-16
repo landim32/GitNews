@@ -13,6 +13,7 @@ builder.Services.ConfigureServices(opt =>
     opt.GitHub = settings.GitHub;
     opt.OpenAI = settings.OpenAI;
     opt.Database = settings.Database;
+    opt.NNews = settings.NNews;
 });
 builder.Services.AddSingleton<IUserInteractionService, NonInteractiveUserInteractionService>();
 

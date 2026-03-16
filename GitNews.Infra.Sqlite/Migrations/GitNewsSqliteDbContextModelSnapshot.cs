@@ -61,6 +61,12 @@ namespace GitNews.Infra.Sqlite.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_processed");
 
+                    b.Property<bool>("IsPublishedToNNews")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_published_to_nnews");
+
                     b.Property<string>("Repository")
                         .IsRequired()
                         .HasMaxLength(500)
