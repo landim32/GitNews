@@ -114,6 +114,12 @@ namespace GitNews.Infra.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
 
+                    b.Property<bool>("IsProcessed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_processed");
+
                     b.Property<DateTime>("ProcessedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")

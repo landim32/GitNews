@@ -103,6 +103,12 @@ namespace GitNews.Infra.Sqlite.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
+                    b.Property<bool>("IsProcessed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_processed");
+
                     b.Property<DateTime>("ProcessedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT")

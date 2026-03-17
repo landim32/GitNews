@@ -39,6 +39,58 @@ public class GitHubAppService : IGitHubAppService
         return names;
     }
 
+    public async Task<IReadOnlyList<RepositoryInfo>> GetAllRepositoriesAsync(string owner, bool includeForks, string organizations)
+    {
+        var result = new List<RepositoryInfo>();
+
+        // User repositories
+        _logger.LogInformation("Listing repositories for user {Owner}...", owner);
+        var userRepos = await _client.Repository.GetAllForUser(owner);
+        var filteredUser = userRepos.AsEnumerable();
+        if (!includeForks)
+            filteredUser = filteredUser.Where(r => !r.Fork);
+
+        result.AddRange(filteredUser.Select(r => new RepositoryInfo
+        {
+            Owner = r.Owner.Login,
+            Name = r.Name
+        }));
+        _logger.LogInformation("User repositories found: {Count}", result.Count);
+
+        // Organization repositories (public only)
+        var orgNames = organizations
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var orgName in orgNames)
+        {
+            try
+            {
+                _logger.LogInformation("Listing public repositories for organization {Org}...", orgName);
+                var orgRepos = await _client.Repository.GetAllForOrg(orgName);
+
+                var filteredOrg = orgRepos.Where(r => !r.Private);
+                if (!includeForks)
+                    filteredOrg = filteredOrg.Where(r => !r.Fork);
+
+                var orgRepoInfos = filteredOrg.Select(r => new RepositoryInfo
+                {
+                    Owner = orgName,
+                    Name = r.Name
+                }).ToList();
+
+                result.AddRange(orgRepoInfos);
+                _logger.LogInformation("Public repositories from {Org}: {Count}", orgName, orgRepoInfos.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to list repositories for organization {Org}", orgName);
+            }
+        }
+
+        _logger.LogInformation("Total repositories found (user + orgs): {Count}", result.Count);
+        return result;
+    }
+
     public async Task<RepositoryContextInfo> GetRepositoryContextAsync(string owner, string repository, int maxCommits)
     {
         var context = new RepositoryContextInfo
@@ -193,6 +245,35 @@ public class GitHubAppService : IGitHubAppService
         }
 
         return commits;
+    }
+
+    public async Task<CommitInfoDto?> GetCommitDetailAsync(string owner, string repository, string sha)
+    {
+        try
+        {
+            var commitDetail = await _client.Repository.Commit.Get(owner, repository, sha);
+
+            return new CommitInfoDto
+            {
+                Sha = commitDetail.Sha,
+                Message = commitDetail.Commit.Message,
+                Author = commitDetail.Commit.Author?.Name ?? "Unknown",
+                Date = commitDetail.Commit.Author?.Date ?? DateTimeOffset.MinValue,
+                Files = commitDetail.Files?.Select(f => new FileChangeInfo
+                {
+                    FileName = f.Filename,
+                    Status = f.Status,
+                    Additions = f.Additions,
+                    Deletions = f.Deletions,
+                    Patch = TruncatePatch(f.Patch ?? string.Empty, 500)
+                }).ToList() ?? new List<FileChangeInfo>()
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch commit detail for {Sha} in {Owner}/{Repository}", sha, owner, repository);
+            return null;
+        }
     }
 
     private static string TruncatePatch(string patch, int maxLength)

@@ -57,4 +57,47 @@ public class ProcessedCommitRepository : IProcessedCommitRepository<ProcessedCom
 
         await _context.SaveChangesAsync();
     }
+
+    public async Task ImportCommitsAsync(string repository, IEnumerable<string> shas)
+    {
+        var shaList = shas.ToList();
+        var existingShas = await _context.ProcessedCommits
+            .AsNoTracking()
+            .Where(c => c.Repository == repository && shaList.Contains(c.Sha))
+            .Select(c => c.Sha)
+            .ToListAsync();
+
+        var newShas = shaList.Except(existingShas);
+
+        foreach (var sha in newShas)
+        {
+            _context.ProcessedCommits.Add(new ProcessedCommit
+            {
+                Repository = repository,
+                Sha = sha,
+                IsProcessed = false,
+                ProcessedAt = DateTime.UtcNow
+            });
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<List<ProcessedCommit>> GetRandomUnprocessedAsync(int count)
+    {
+        return await _context.ProcessedCommits
+            .Where(c => !c.IsProcessed)
+            .OrderBy(_ => EF.Functions.Random())
+            .Take(count)
+            .ToListAsync();
+    }
+
+    public async Task SetCommitProcessedAsync(long id)
+    {
+        var commit = await _context.ProcessedCommits.FindAsync(id);
+        if (commit == null) return;
+
+        commit.IsProcessed = true;
+        await _context.SaveChangesAsync();
+    }
 }

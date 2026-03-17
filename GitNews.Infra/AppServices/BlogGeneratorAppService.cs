@@ -31,7 +31,7 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
     {
         var prompt = BuildPrompt(context);
 
-        _logger.LogInformation("Sending prompt to ChatGPT...");
+        _logger.LogInformation("Sending prompt to ChatGPT ({Length} chars)...", prompt.Length);
         var response = await CallChatGptAsync(prompt);
         _logger.LogInformation("Response received from ChatGPT");
 
@@ -121,11 +121,11 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
             model = _settings.Model,
             messages = new[]
             {
-                new { role = "system", content = "Você é um redator técnico que cria artigos de blog sobre projetos de software. Responda sempre em Markdown puro, nunca em JSON." },
+                new { role = "system", content = "Você é um redator técnico que cria artigos de blog sobre projetos de software. Responda sempre em Markdown puro, nunca em JSON. IMPORTANTE: seus artigos devem ter entre 1200 e 1800 palavras. Nunca gere artigos curtos." },
                 new { role = "user", content = prompt }
             },
             temperature = 0.7,
-            max_tokens = 4000
+            max_tokens = 4096
         };
 
         var json = JsonSerializer.Serialize(requestBody);
@@ -144,7 +144,12 @@ public class BlogGeneratorAppService : IBlogGeneratorAppService
                 continue;
             }
 
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                _logger.LogError("OpenAI API error {StatusCode}: {ErrorBody}", (int)response.StatusCode, errorBody);
+                response.EnsureSuccessStatusCode();
+            }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             var chatResponse = JsonSerializer.Deserialize<ChatCompletionResponse>(responseJson);

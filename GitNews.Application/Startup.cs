@@ -31,7 +31,9 @@ public static class Startup
             opt.Token = settings.GitHub.Token;
             opt.Owner = settings.GitHub.Owner;
             opt.MaxCommits = settings.GitHub.MaxCommits;
+            opt.MaxArticles = settings.GitHub.MaxArticles;
             opt.IncludeForks = settings.GitHub.IncludeForks;
+            opt.Organizations = settings.GitHub.Organizations;
         });
 
         services.Configure<OpenAISettings>(opt =>

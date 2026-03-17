@@ -86,9 +86,15 @@ class Program
                     return published ? 0 : 1;
                 }
 
+                if (command == "import")
+                {
+                    var result = await processor.ImportCommitsAsync();
+                    return result.HasErrors ? 1 : 0;
+                }
+
                 if (command == "process")
                 {
-                    var result = await processor.ProcessAllRepositoriesAsync();
+                    var result = await processor.ProcessArticlesAsync();
                     return result.HasErrors ? 1 : 0;
                 }
 
@@ -127,6 +133,8 @@ class Program
                 return "publish-medium";
             if (arg.Equals("--publish-nnews", StringComparison.OrdinalIgnoreCase))
                 return "publish-nnews";
+            if (arg.Equals("--import", StringComparison.OrdinalIgnoreCase))
+                return "import";
             if (arg.Equals("--process", StringComparison.OrdinalIgnoreCase))
                 return "process";
         }
@@ -148,6 +156,8 @@ class Program
                 case "--publish-medium":
                     break;
                 case "--publish-nnews":
+                    break;
+                case "--import":
                     break;
                 case "--process":
                     break;
@@ -226,7 +236,8 @@ class Program
         System.Console.WriteLine("Usage: GitNews.Console [options]");
         System.Console.WriteLine();
         System.Console.WriteLine("Commands:");
-        System.Console.WriteLine("  --process                   Process all repositories and generate articles");
+        System.Console.WriteLine("  --import                    Import commits from all GitHub repositories into the database");
+        System.Console.WriteLine("  --process                   Generate articles from random unprocessed commits (max --max-articles)");
         System.Console.WriteLine("  --export                    Export oldest unprocessed article to output/ (markdown + image)");
         System.Console.WriteLine("  --output-dir <dir>          Output directory for --export (default: ./output)");
         System.Console.WriteLine("  --publish-medium            Publish oldest unprocessed article to Medium via Chrome CDP");
@@ -236,7 +247,7 @@ class Program
         System.Console.WriteLine("  -o, --owner <owner>         GitHub account owner");
         System.Console.WriteLine("  --github-token <token>      GitHub access token");
         System.Console.WriteLine("  --openai-key <key>          OpenAI API key (ChatGPT)");
-        System.Console.WriteLine("  -m, --model <model>         ChatGPT model (default: gpt-4)");
+        System.Console.WriteLine("  -m, --model <model>         ChatGPT model (default: gpt-4-turbo)");
         System.Console.WriteLine("  --max-commits <n>           Max commits per repository (default: 30)");
         System.Console.WriteLine("  --max-articles <n>          Max articles to generate per run (default: 3)");
         System.Console.WriteLine("  --include-forks             Include forked repositories");
@@ -251,10 +262,14 @@ class Program
         System.Console.WriteLine("  Database__ConnectionString   PostgreSQL connection string");
         System.Console.WriteLine();
         System.Console.WriteLine("Examples:");
-        System.Console.WriteLine("  # Process all repositories from an account:");
-        System.Console.WriteLine("  GitNews.Console --process --owner microsoft --github-token ghp_xxx --openai-key sk-xxx");
+        System.Console.WriteLine("  # Import commits from all repositories:");
+        System.Console.WriteLine("  GitNews.Console --import --owner microsoft --github-token ghp_xxx");
         System.Console.WriteLine();
-        System.Console.WriteLine("  # Process with environment variables:");
+        System.Console.WriteLine("  # Generate articles from unprocessed commits:");
+        System.Console.WriteLine("  GitNews.Console --process --openai-key sk-xxx");
+        System.Console.WriteLine();
+        System.Console.WriteLine("  # Import and process with environment variables:");
+        System.Console.WriteLine("  GitHub__Owner=microsoft GitNews.Console --import");
         System.Console.WriteLine("  GitHub__Owner=microsoft GitNews.Console --process");
         System.Console.WriteLine();
         System.Console.WriteLine("  # Export an article:");

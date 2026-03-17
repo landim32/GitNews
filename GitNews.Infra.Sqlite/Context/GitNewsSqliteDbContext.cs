@@ -98,6 +98,10 @@ public class GitNewsSqliteDbContext : DbContext
                 .HasColumnName("processed_at")
                 .HasDefaultValueSql("datetime('now')");
 
+            entity.Property(e => e.IsProcessed)
+                .HasColumnName("is_processed")
+                .HasDefaultValue(false);
+
             entity.HasIndex(e => new { e.Repository, e.Sha })
                 .IsUnique()
                 .HasDatabaseName("ix_processed_commits_repository_sha");

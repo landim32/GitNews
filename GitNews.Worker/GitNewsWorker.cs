@@ -57,7 +57,8 @@ public class GitNewsWorker : BackgroundService
                 _logger.LogInformation("Database updated");
 
                 var processor = provider.GetRequiredService<IGitNewsProcessorService>();
-                await processor.ProcessAllRepositoriesAsync(stoppingToken);
+                await processor.ImportCommitsAsync(stoppingToken);
+                await processor.ProcessArticlesAsync(stoppingToken);
             }
             catch (Exception ex)
             {

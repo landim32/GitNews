@@ -48,139 +48,180 @@ public class GitNewsProcessorService : IGitNewsProcessorService
         _logger = logger;
     }
 
-    public async Task<ProcessingResultInfo> ProcessAllRepositoriesAsync(CancellationToken cancellationToken = default)
+    public async Task<ProcessingResultInfo> ImportCommitsAsync(CancellationToken cancellationToken = default)
     {
-        var repoNames = await _githubService.GetRepositoryNamesAsync(
+        var repositories = await _githubService.GetAllRepositoriesAsync(
             _githubSettings.Owner,
-            _githubSettings.IncludeForks);
-        var repositories = repoNames.ToList();
+            _githubSettings.IncludeForks,
+            _githubSettings.Organizations);
 
-        _logger.LogInformation("Total repositories to process: {Count}", repositories.Count);
+        _logger.LogInformation("Total repositories to import: {Count}", repositories.Count);
 
-        var maxArticles = _githubSettings.MaxArticles;
         var result = new ProcessingResultInfo { TotalCount = repositories.Count };
 
-        for (int i = 0; i < repositories.Count; i++)
+        foreach (var repo in repositories)
         {
             if (cancellationToken.IsCancellationRequested) break;
 
+            try
+            {
+                await ImportRepositoryCommitsAsync(repo.Owner, repo.Name, cancellationToken);
+                result.SuccessCount++;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error importing commits from {Repo}", repo.FullName);
+                result.ErrorCount++;
+            }
+        }
+
+        _logger.LogInformation("Import completed! Success: {Success} | Errors: {Errors} | Total repos: {Total}",
+            result.SuccessCount, result.ErrorCount, result.TotalCount);
+
+        return result;
+    }
+
+    public async Task<ProcessingResultInfo> ProcessArticlesAsync(CancellationToken cancellationToken = default)
+    {
+        var maxArticles = _githubSettings.MaxArticles;
+        var result = new ProcessingResultInfo();
+
+        _logger.LogInformation("Processing up to {MaxArticles} random unprocessed commits...", maxArticles);
+
+        var unprocessedCommits = await _commitRepo.GetRandomUnprocessedAsync(maxArticles * 3);
+        _logger.LogInformation("Found {Count} unprocessed commits to evaluate", unprocessedCommits.Count);
+
+        result.TotalCount = unprocessedCommits.Count;
+
+        foreach (var commit in unprocessedCommits)
+        {
+            if (cancellationToken.IsCancellationRequested) break;
             if (result.SuccessCount >= maxArticles)
             {
                 _logger.LogInformation("Reached maximum articles limit ({MaxArticles}). Stopping", maxArticles);
                 break;
             }
 
-            var repoName = repositories[i];
-            _logger.LogInformation("[{Current}/{Total}] Processing: {Owner}/{Repo}",
-                i + 1, repositories.Count, _githubSettings.Owner, repoName);
-
             try
             {
-                var articlesGenerated = await ProcessRepositoryCommitsAsync(repoName, maxArticles - result.SuccessCount, cancellationToken);
-                result.SuccessCount += articlesGenerated;
-                if (articlesGenerated == 0)
+                var generated = await ProcessSingleCommitAsync(commit, cancellationToken);
+                if (generated)
+                    result.SuccessCount++;
+                else
                     result.SkippedCount++;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing {Repo}", repoName);
+                _logger.LogError(ex, "Error processing commit {Sha} from {Repo}", commit.Sha, commit.Repository);
                 result.ErrorCount++;
             }
         }
 
-        _logger.LogInformation("Processing completed! Success: {Success} | Skipped: {Skipped} | Errors: {Errors} | Total: {Total}",
-            result.SuccessCount, result.SkippedCount, result.ErrorCount, result.TotalCount);
+        _logger.LogInformation("Processing completed! Articles generated: {Success} | Skipped: {Skipped} | Errors: {Errors}",
+            result.SuccessCount, result.SkippedCount, result.ErrorCount);
 
         return result;
     }
 
-    private async Task<int> ProcessRepositoryCommitsAsync(string repoName, int remainingArticles, CancellationToken cancellationToken)
+    private async Task ImportRepositoryCommitsAsync(string owner, string repoName, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Collecting repository data...");
+        var repoFullName = $"{owner}/{repoName}";
+        _logger.LogInformation("Importing commits from {Repo}...", repoFullName);
+
         var context = await _githubService.GetRepositoryContextAsync(
-            _githubSettings.Owner,
+            owner,
             repoName,
             _githubSettings.MaxCommits);
 
         if (context.Commits.Count == 0)
         {
-            _logger.LogInformation("No recent commits found. Skipping");
-            return 0;
+            _logger.LogInformation("No recent commits found in {Repo}. Skipping import", repoFullName);
+            return;
         }
 
-        var repoFullName = $"{_githubSettings.Owner}/{repoName}";
-        var articlesGenerated = 0;
+        var shas = context.Commits.Select(c => c.Sha).ToList();
 
-        foreach (var commit in context.Commits)
+        await _commitRepo.ImportCommitsAsync(repoFullName, shas);
+        _logger.LogInformation("Imported {Count} commits from {Repo}", shas.Count, repoFullName);
+    }
+
+    private async Task<bool> ProcessSingleCommitAsync(ProcessedCommit commitRecord, CancellationToken cancellationToken)
+    {
+        var parts = commitRecord.Repository.Split('/', 2);
+        var owner = parts[0];
+        var repoName = parts[1];
+
+        _logger.LogInformation("Processing commit {Sha} from {Repo}...", commitRecord.Sha[..7], commitRecord.Repository);
+
+        // Mark as processed immediately to avoid reprocessing
+        await _commitRepo.SetCommitProcessedAsync(commitRecord.Id);
+
+        // Fetch commit detail from GitHub
+        var commitDetail = await _githubService.GetCommitDetailAsync(owner, repoName, commitRecord.Sha);
+        if (commitDetail == null)
         {
-            if (cancellationToken.IsCancellationRequested) break;
-            if (articlesGenerated >= remainingArticles) break;
-
-            if (await _commitRepo.IsCommitProcessedAsync(repoFullName, commit.Sha))
-                continue;
-
-            _logger.LogInformation("Processing commit {Sha}: {Message}", commit.Sha[..7], commit.Message);
-
-            // Mark commit as processed regardless of article generation
-            await _commitRepo.MarkAsProcessedAsync(repoFullName, new[] { commit.Sha });
-
-            // Build context with only this commit
-            var commitContext = new RepositoryContextInfo
-            {
-                Owner = context.Owner,
-                Repository = context.Repository,
-                ReadmeContent = context.ReadmeContent,
-                TotalCommitCount = context.TotalCommitCount,
-                Commits = new List<CommitInfoDto> { commit }
-            };
-
-            _logger.LogInformation("Generating blog article via ChatGPT...");
-            var blogPost = await _blogGenerator.GenerateBlogPostAsync(commitContext);
-
-            if (blogPost.Title.Contains("Sem novidades", StringComparison.OrdinalIgnoreCase)
-                || string.IsNullOrWhiteSpace(blogPost.Content))
-            {
-                _logger.LogInformation("No technical novelties in commit {Sha}. Skipping", commit.Sha[..7]);
-                continue;
-            }
-
-            _logger.LogInformation("Generating article embedding...");
-            var embeddingText = $"{blogPost.Title} {blogPost.Content}";
-            var embedding = await _embeddingService.GenerateEmbeddingAsync(embeddingText);
-
-            _logger.LogInformation("Checking for similar articles...");
-            var similarArticles = await _articleRepo.FindSimilarAsync(embedding);
-
-            if (similarArticles.Count > 0)
-            {
-                _logger.LogInformation("Similar article already exists: \"{Title}\". Skipping", similarArticles[0].Title);
-                continue;
-            }
-
-            _logger.LogInformation("Title: {Title}", blogPost.Title);
-            _logger.LogInformation("Category: {Category}", blogPost.Category);
-            _logger.LogInformation("Tags: {Tags}", string.Join(", ", blogPost.Tags));
-
-            _logger.LogInformation("Saving article to database...");
-            var article = new Article
-            {
-                Title = blogPost.Title,
-                Content = blogPost.Content,
-                Category = blogPost.Category,
-                Tags = string.Join(", ", blogPost.Tags),
-                Repository = repoFullName,
-                Author = blogPost.Author,
-                Slug = blogPost.Slug,
-                Embedding = embedding,
-                CreatedAt = DateTime.UtcNow
-            };
-            await _articleRepo.SaveAsync(article);
-            _logger.LogInformation("Article saved: {Title}", article.Title);
-
-            articlesGenerated++;
+            _logger.LogWarning("Could not fetch commit detail for {Sha}. Skipping", commitRecord.Sha[..7]);
+            return false;
         }
 
-        return articlesGenerated;
+        // Fetch repository context for prompt building
+        var repoContext = await _githubService.GetRepositoryContextAsync(owner, repoName, 1);
+
+        var commitContext = new RepositoryContextInfo
+        {
+            Owner = owner,
+            Repository = repoName,
+            ReadmeContent = repoContext.ReadmeContent,
+            TotalCommitCount = repoContext.TotalCommitCount,
+            Commits = new List<CommitInfoDto> { commitDetail }
+        };
+
+        _logger.LogInformation("Generating blog article via ChatGPT...");
+        var blogPost = await _blogGenerator.GenerateBlogPostAsync(commitContext);
+
+        if (blogPost.Title.Contains("Sem novidades", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(blogPost.Content))
+        {
+            _logger.LogInformation("No technical novelties in commit {Sha}. Skipping", commitRecord.Sha[..7]);
+            return false;
+        }
+
+        _logger.LogInformation("Generating article embedding...");
+        var embeddingText = $"{blogPost.Title} {blogPost.Content}";
+        var embedding = await _embeddingService.GenerateEmbeddingAsync(embeddingText);
+
+        _logger.LogInformation("Checking for similar articles...");
+        var similarArticles = await _articleRepo.FindSimilarAsync(embedding);
+
+        if (similarArticles.Count > 0)
+        {
+            _logger.LogInformation("Similar article already exists: \"{Title}\". Skipping", similarArticles[0].Title);
+            return false;
+        }
+
+        _logger.LogInformation("Title: {Title}", blogPost.Title);
+        _logger.LogInformation("Category: {Category}", blogPost.Category);
+        _logger.LogInformation("Tags: {Tags}", string.Join(", ", blogPost.Tags));
+
+        var repoFullName = commitRecord.Repository;
+
+        _logger.LogInformation("Saving article to database...");
+        var article = new Article
+        {
+            Title = blogPost.Title,
+            Content = blogPost.Content,
+            Category = blogPost.Category,
+            Tags = string.Join(", ", blogPost.Tags),
+            Repository = repoFullName,
+            Author = blogPost.Author,
+            Slug = blogPost.Slug,
+            Embedding = embedding,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _articleRepo.SaveAsync(article);
+        _logger.LogInformation("Article saved: {Title}", article.Title);
+
+        return true;
     }
 
     public async Task<bool> ExportOldestUnprocessedArticleAsync(string outputDir, CancellationToken cancellationToken = default)

@@ -18,12 +18,16 @@ public class GitHubSettings
     /// Se true, inclui repositórios forkados. Padrão: false.
     /// </summary>
     public bool IncludeForks { get; set; } = false;
+    /// <summary>
+    /// Organizações cujos repositórios públicos serão importados. Separadas por vírgula.
+    /// </summary>
+    public string Organizations { get; set; } = string.Empty;
 }
 
 public class OpenAISettings
 {
     public string ApiKey { get; set; } = string.Empty;
-    public string Model { get; set; } = "gpt-4";
+    public string Model { get; set; } = "gpt-4-turbo";
     public string BaseUrl { get; set; } = "https://api.openai.com/v1";
 }
 

@@ -20,7 +20,7 @@ Analise os commits abaixo (incluindo os diffs de código) e identifique **novida
    - NUNCA inclua metadados de commit (sha, autor, data) no artigo.
 3. **Explique o que cada trecho faz e por que aquela abordagem foi escolhida.**
 4. **O título NÃO deve conter o nome do projeto/repositório.** Foque na técnica ou novidade (ex: 'Implementando Repository Pattern com EF Core').
-5. **O artigo deve ter entre 800 e 1200 palavras.** Seja detalhado e completo.
+5. **O artigo DEVE ter entre 1200 e 1800 palavras. NUNCA gere menos que 1200 palavras.** Seja detalhado, aprofunde cada tópico com explicações, contexto e exemplos de código completos. Se necessário, adicione seções extras como "Boas práticas", "Alternativas" ou "Considerações de performance" para atingir o mínimo de palavras.
 6. **O foco do artigo é o assunto técnico, NÃO o projeto.** O projeto é apenas o contexto de onde a técnica foi observada.
    - Cite o nome do projeto **apenas uma vez**, preferencialmente no final do artigo, próximo a um exemplo prático do assunto.
    - No final do artigo, inclua um parágrafo como: "O projeto [nome] implementa essa abordagem no repositório [{{REPO_URL}}]({{REPO_URL}})."
